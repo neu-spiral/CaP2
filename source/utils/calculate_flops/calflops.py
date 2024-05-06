@@ -7,7 +7,7 @@ import os
 import sys
 import yaml
 
-sys.path.append('/home/tong/Model_Partition/MoP/source/utils/calculate_flops/')
+sys.path.append('./source/utils/calculate_flops/')
 from ptflops.flops_counter import get_model_complexity_info
 from thop import profile
 

@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import _LRScheduler
 
-import models
+from .. import models
 from ..models.masknet import *
 from ..models.flashnet import CoordNet, CameraNet, LidarNet
 
