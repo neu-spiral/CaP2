@@ -1,5 +1,6 @@
 #!/bin/bash
 
 
-export PYTHONPATH="${PYTHONPATH}:./source/:./source/models/:./source/core/:./source/util/"
+export PYTHONPATH="${PYTHONPATH}:./source/"
+# export PYTHONPATH="${PYTHONPATH}:./source/models/"
 echo "Environment set"

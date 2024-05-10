@@ -185,7 +185,8 @@ class MoP:
         print('Finetune starts')
         masknet_to_dense(self.model, self.model_r)
         test_filter_sparsity(self.model_r)
-        test_partition(self.model_r, num_partition=self.num_partition)
+        # test_partition(self.model_r, partition=self.num_partition)
+        test_partition(self.model_r, partition=self.configs['partition'])
         
         # get mask
         masks = get_model_mask(model=self.model_r)
@@ -221,7 +222,9 @@ class MoP:
             acc = self.test_model(self.model, criterion, cepoch)
             if acc > best:
                 best = acc
-                save_model(self.model, get_model_path("{}".format(self.model_file.split('.')[0]+'.pt')))
+                # save_model(self.model, get_model_path("{}".format(self.model_file.split('.')[0]+'.pt')))
+                format_name = self.model_file.split('-')
+                save_model(self.model, get_model_path("{}".format('-'.join(format_name[:5])+'.pt')))
     
     def test_model(self, model, criterion, cepoch=0):
         acc = self.evalHelper.get_accuracy(model, self.test_loader, criterion, cepoch)
