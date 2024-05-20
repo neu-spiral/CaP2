@@ -3,6 +3,7 @@ import yaml
 import torch
 import numpy as np
 import time
+import itertools
 def partition_generator(configs, model):
     partition = {}
     num_partition = {}
@@ -10,16 +11,18 @@ def partition_generator(configs, model):
     # get # partition for each layer
     if configs['num_partition'].isdigit():
         # Todo: automatically set bn_partition
-        ratio_partition, map_partition = [], []
+        ratio_partition, map_partition = {}, {}
         bn_partition = [int(configs['num_partition'])] * 9
-        for name, W in model.named_parameters() + list({'inputs':None}.items()):
-            if (len(W.size()) == 4) or name=='inputs': 
+        for name, W in itertools.chain(model.named_parameters() , list({'inputs':None}.items())):
+            if name=='inputs' or (len(W.size()) == 4): 
+                # TODO: num and maps do not change from loop to loop
                 num = int(configs['num_partition'])
                 maps = np.ones((num,num))
                 
                 num_partition[name] = num
                 ratio_partition[name] = [1]*num
-                map_partition = np.fill_diagonal(maps, 0)
+                np.fill_diagonal(maps, 0)
+                map_partition[name] = maps
                 
     elif os.path.exists(configs['num_partition']):
         with open(configs['num_partition'], "r") as stream:
@@ -128,7 +131,7 @@ def featuremap_summary(model, partition, inputs):
     def register_hook(name):
         def hook(module, input, output):
             outshape = list(output.size())
-            outsize = outshape[2]*outshape[3] if len(outshape)==4 else 1
+            outsize = outshape[2]*outshape[3] if len(outshape)==4 else 1 # ignores dim 0 and 1 which are for batch size and channel size?
             partition[name]['outsize'] = outsize
             #print(name, class_name, outsize, outshape)
         return hook
