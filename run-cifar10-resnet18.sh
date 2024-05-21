@@ -1,12 +1,12 @@
 #!/bin/bash
 
-dataset=cifar10
-model=resnet18
+# dataset=cifar10
+# model=resnet18
 
-# dataset=cifar100
-# model=wrn28
+dataset=cifar100
+model=wrn28
 
-version=3
+version=10
 cuda_device=1
 
 yaml_version=2
@@ -28,11 +28,11 @@ prune_finetune() {
     python -m source.core.run_partition -cfg config/${dataset}.yaml \
         -mf ${save_name}.pt  \
         --device $1 -np config/${model}-$2.yaml -st ${st} -pfl -lcm $3 -pr $4 -co \
-        -lr 0.01 -ep 300 -ree 100 -relr 0.001 \
+        -lr 0.01 -ep 3 -ree 2 -relr 0.001 \
         >logs/${save_name}.out
 }
 
-prune_finetune "cuda:${cuda_device}" v${yaml_version} 0.001 0.75 kernel
+prune_finetune "cuda:${cuda_device}" v${yaml_version} 0.001 0.2 kernel
 
 #pretrainli yaparsan -lm i commentleyip, teacher='' olmasina gerek yok btw (cunku teacher i kullanan yok -lm haric), 
 #model adi = cifar10-resnet18-kernel-npv2-versx.pt, log u : cifar10-resnet18-kernel-npv2-versx-pr0.75-lcm0.001.out
