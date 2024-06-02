@@ -1,13 +1,14 @@
 from .. import *
 from . import *
 from .engine import *
+from os import environ
 
 def get_args():
     """ args from input
     """
     parser = argparse.ArgumentParser(description='Model Partition')
     
-    parser.add_argument('-cfg', '--config', required=True,type=str, help='config input path')
+    parser.add_argument('-cfg', '--config',default=environ.get("config"),type=str, help='config input path')
     parser.add_argument('-tt', '--training-type', default='',type=str, help='training types [hsicprune|backprop]')
     parser.add_argument('-bs', '--batch-size', default=0,type=int, help='minibatch size')
     parser.add_argument('-op', '--optimizer', default='', type=str, help='optimizer')
