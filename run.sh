@@ -1,27 +1,47 @@
 #!/bin/bash
 
 cuda_device=2
+yaml_version=0
+prune_ratio=0.5
+num_partitions=2
 
-yaml_version=2
+# yaml_version=0 meaning no yaml file is used, num_partitions=2,4,8 is used
 
-dataset=cifar10
-model=resnet18
+# yaml_version=1
+# prune_ratio=0.5
 
-# dataset=cifar100
-# model=config/wrn28-${yaml_version}.yaml
+# yaml_version=2
+# prune_ratio=0.75
 
-# dataset=cifar100
-# model=4
+# yaml_version=3
+# prune_ratio=0.875
+
+
+
+
+
+
+# dataset=cifar10
+# model=resnet18
+
+dataset=cifar100
+model=wrn28
+
 
 
 # teacher=cifar10-resnet18-teacher.pt
 # teacher=cifar10-resnet18-kernel-npv2-pr0.pt
-teacher=cifar10-resnet18-kernel-npv${yaml_version}.pt
+# teacher=cifar10-resnet18-kernel-npv0.pt
+
+teacher=cifar100-wrn28-kernel-npv0.pt
 
 
 # teacher=''
-
+# 
 # LOAD MODEL YAPARKEN USTTEKINI KOYMAYI UNUTMA, -lm yi koy
+
+
+# -np config/${model}-$2.yaml
 
 prune_finetune() {
     st=$5
@@ -31,14 +51,17 @@ prune_finetune() {
         -lm ${teacher} \
         -mf ${save_name}.pt \
         --device $1 \
-        -np config/${model}-$2.yaml \
+        -np ${num_partitions} \
         -st ${st} \
         -pfl -lcm $3 -pr $4 -co \
-        -lr 0.01 -ep 300 -ree 100 -relr 0.001 \
+        -lr 0.01 \
+        -ep 300 \
+        -ree 100 \
+        -relr 0.001 \
         >logs/${save_name}.out
 }
 
-prune_finetune "cuda:${cuda_device}" v${yaml_version} 0.001 0.875 kernel
+prune_finetune "cuda:${cuda_device}" v${yaml_version} 0.001 ${prune_ratio} kernel
 
 
 #pretrainli yaparsan -lm i commentleyip, teacher='' olmasina gerek yok btw (cunku teacher i kullanan yok -lm haric), 

@@ -57,9 +57,11 @@ class NetworkBlock(nn.Module):
 class WideResNet(nn.Module):
     def __init__(self, depth, widen_factor, dropRate, conv_layer, bn_layer, num_classes, bn_partition=[1]*9, shrink=1):
         super(WideResNet, self).__init__()
+        # nChannels = [depth, depth*widen_factor, depth*widen_factor*2, depth*widen_factor*4]
         nChannels = [16, 16*widen_factor, 32*widen_factor, 64*widen_factor]
         assert (depth - 4) % 6 == 0, 'depth should be 6n+4'
         n = (depth - 4) // 6
+        self.widen_factor = widen_factor
         block = BasicBlock
         # 1st conv before any network block
         self.conv1 = nn.Conv2d(3, nChannels[0], kernel_size=3, stride=1, padding=1, bias=False)
@@ -102,9 +104,9 @@ def wrn16_8(conv_layer, bn_layer, **kwargs):
     return WideResNet(16, 8, 0.0, conv_layer, bn_layer, num_classes=kwargs['num_classes'], bn_partition=bn_partition, shrink=shrink)
 
 def wrn28_10(conv_layer, bn_layer, **kwargs):
-    bn_partition = kwargs['bn_partition'] if 'bn_partition' in kwargs else [1]*13
+    bn_partition = kwargs['bn_partition'] if 'bn_partition' in kwargs else [1]*9
     shrink = kwargs['shrink'] if 'shrink' in kwargs else 1
-    return WideResNet(28, 10, 0.3, conv_layer, bn_layer, kwargs['num_classes'], bn_partition=bn_partition, shrink=shrink)
+    return WideResNet(28, 10, 0.3, conv_layer, bn_layer, num_classes=kwargs['num_classes'], bn_partition=bn_partition, shrink=shrink)
 
 def wrn28_4(conv_layer, bn_layer, **kwargs):
     rob = kwargs['robustness'] if 'robustness' in kwargs else False

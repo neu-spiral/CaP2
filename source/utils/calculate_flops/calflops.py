@@ -39,7 +39,10 @@ def calflops(model, inputs, prune_ratios=[]):
     #         if name in prune_ratios:
     #             param.data.div_(1 - prune_ratios[name])
 
-    print('{:<30}  {:<8}'.format('Computational complexity: ', macs * 2/1000000000)) # GMACs
+    # print('{:<30}  {:<8}'.format('Computational complexity: ', macs * 2/1000000000)) # GMACs
+    # print('{:<30}  {:<8}'.format('Number of parameters: ', params/1000000)) # M
+    print('{:<30}  {:<8}'.format('Computational complexity: ', macs/1000000000)) # G
     print('{:<30}  {:<8}'.format('Number of parameters: ', params/1000000)) # M
+
     #flops, params = get_model_complexity_info(model, (3, 32, 32), as_strings=True, print_per_layer_stat=False)
     #print(flops, params)

@@ -24,7 +24,7 @@ def get_args():
     parser.add_argument('-st', '--sparsity-type', default='', type=str, help='for pruning')
     parser.add_argument('-pr', '--prune-ratio', default=1, type=float, help='pruning ratio')
     parser.add_argument('--admm', action='store_true', help='prune by admm')
-    parser.add_argument('--admm-epochs', default=0, type=int, help='number of interval epochs to update admm (default: 1)')
+    parser.add_argument('--admm-epochs', default=300, type=int, help='number of interval epochs to update admm (default: 1)')
     parser.add_argument('--rho', default=0, type=float, help='admm learning rate (default: 1)')
     parser.add_argument('--multi_rho', action='store_true', help='It works better to make rho monotonically increasing')
     parser.add_argument('-ree', '--retrain-ep', default=-1, type=int, help='training epoch of the masked retrain (default: -lr)')
