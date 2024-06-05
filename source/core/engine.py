@@ -225,7 +225,8 @@ class MoP:
                 # save_model(self.model, get_model_path("{}".format(self.model_file.split('.')[0]+'.pt')))
                 format_name = self.model_file.split('-')
                 save_model(self.model, get_model_path("{}".format('-'.join(format_name[:4])+'.pt')))
-    
+                print('Save model')
+                
     def test_model(self, model, criterion, cepoch=0):
         acc = self.evalHelper.get_accuracy(model, self.test_loader, criterion, cepoch)
         return acc

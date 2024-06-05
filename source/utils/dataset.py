@@ -28,7 +28,7 @@ def get_dataset_from_code(code, batch_size):
             data_folder_path=os.path.join(dataset_root, 'cifar100-data'))
     elif code == 'flash':
         train_loader, test_loader = get_flash_data(batch_size=batch_size,
-            data_folder_path='/home/batool/FL/data_half_half_size')
+            data_folder_path='/raid/yarkin/cap/data/FLASH_Dataset_3_Processed')
     elif code == 'esc':
         train_loader, test_loader = get_esc_data(batch_size=batch_size,
             data_folder_path='/mnt/WDMyBook/tong/ESC/')

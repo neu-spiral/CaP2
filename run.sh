@@ -1,11 +1,15 @@
 #!/bin/bash
 
 cuda_device=2
-yaml_version=0
-prune_ratio=0.5
-num_partitions=2
+yaml_version=0 # meaning no yaml file is used, num_partitions=2,4,8 is used
 
-# yaml_version=0 meaning no yaml file is used, num_partitions=2,4,8 is used
+# prune_ratio=0.5
+# num_partitions=2
+# prune_ratio=0.75
+# num_partitions=4
+prune_ratio=0.875
+num_partitions=8
+
 
 # yaml_version=1
 # prune_ratio=0.5
@@ -21,19 +25,26 @@ num_partitions=2
 
 
 
-# dataset=cifar10
-# model=resnet18
+dataset=cifar10
+model=resnet18
 
-dataset=cifar100
-model=wrn28
+# dataset=cifar100
+# model=wrn28
+
+# dataset=esc
+# model=escnet
+
+# dataset=flash
+# model=flashnet
 
 
+teacher=cifar10-resnet18-kernel-npv0.pt
 
-# teacher=cifar10-resnet18-teacher.pt
-# teacher=cifar10-resnet18-kernel-npv2-pr0.pt
-# teacher=cifar10-resnet18-kernel-npv0.pt
+# teacher=cifar100-wrn28-kernel-npv0.pt
 
-teacher=cifar100-wrn28-kernel-npv0.pt
+# teacher=esc-escnet-kernel-npv0.pt
+
+# teacher=flash-flashnet-kernel-npv0.pt
 
 
 # teacher=''

@@ -100,7 +100,7 @@ def set_optimizer(configs, model, train_loader, opt, lr, epochs):
     # optimizer
     optimizer_init_lr = configs['warmup_lr'] if configs['warmup'] else lr
     if opt == 'sgd':
-        optimizer = torch.optim.SGD(model.parameters(), optimizer_init_lr, momentum=0.9, weight_decay=5e-4)
+        optimizer = torch.optim.SGD(model.parameters(), optimizer_init_lr, momentum=0.9, weight_decay=1e-4)
         # cifar100: 5e-4; others: 1e-4
     else:
         optimizer = torch.optim.Adam(model.parameters(), optimizer_init_lr)
@@ -124,22 +124,27 @@ def set_optimizer(configs, model, train_loader, opt, lr, epochs):
         elif configs['data_code'] == 'cifar10':
             gamma=0.1
             if epochs > 150:
-                epoch_milestones = [80, 150]
+                # epoch_milestones = [80, 150]
+                epoch_milestones = [200]
             else:
-                epoch_milestones = [65, 90]
+                # epoch_milestones = [65, 90]
+                epoch_milestones = [80]
         elif configs['data_code'] == 'cifar100':
-            gamma=0.2
+            gamma=0.1
             # Adversarial Concurrent Training: Optimizing Robustness and Accuracy Trade-off of Deep Neural Networks
             if epochs > 150:
-                epoch_milestones = [60, 120, 160]
+                # epoch_milestones = [60, 120, 160]
+                epoch_milestones = [80, 200]
             else:
-                epoch_milestones = [65, 90]
+                # epoch_milestones = [65, 90]
+                epoch_milestones = [65]
         else:
             gamma=0.1
             if epochs > 150:
                 epoch_milestones = [80, 150]
             else:
                 epoch_milestones = [65, 90]
+        # gamma=1.0
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[i * len(train_loader) for i in epoch_milestones], gamma=gamma)
     #print(epochs, [i * len(train_loader) for i in epoch_milestones])
     if configs['warmup']:
