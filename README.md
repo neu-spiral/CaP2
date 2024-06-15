@@ -13,14 +13,7 @@ On experiments over real-world scenarios, it simultaneously reduces total execut
 
 
 ## Environment Setup
-Please install the python dependencies and packages found below:
-```bash
-pytorch-1.6.0
-numpy-1.16.1
-scipy-1.3.1
-tqdm-4.33.0
-yaml-0.1.7
-```    
+Please install either python 3.9.X or 3.10.X and create a virtual environment using the requirements.txt file.
 
 
 ## Instructions
