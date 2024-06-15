@@ -63,9 +63,9 @@ def load_state_dict(model, state_dict, bn_par=False, partition={}):
 #def load_bn(param, num_partition=1):
     
 def get_model_path(filename, idx=None):
-    filepath = "{}/assets/models/{}".format(os.getcwd(), filename)
+    filepath = os.path.join(os.getcwd(), 'assets', 'models', filename)
     return filepath
 
 def get_fig_path(filename, idx=None):
-    filepath = "{}/assets/figs/{}".format(os.getcwd(), filename)
+    filepath = os.path.join(os.getcwd(),'assets','figs', filename)
     return filepath
