@@ -1,14 +1,14 @@
 #!/bin/bash
 
-cuda_device=2
+cuda_device=1
 yaml_version=0 # meaning no yaml file is used, num_partitions=2,4,8 is used
 
 # prune_ratio=0.5
 # num_partitions=2
-# prune_ratio=0.75
-# num_partitions=4
-prune_ratio=0.875
-num_partitions=8
+prune_ratio=0.75
+num_partitions=4
+# prune_ratio=0.875
+# num_partitions=8
 
 
 # yaml_version=1
@@ -25,8 +25,8 @@ num_partitions=8
 
 
 
-dataset=cifar10
-model=resnet18
+# dataset=cifar10
+# model=resnet18
 
 # dataset=cifar100
 # model=wrn28
@@ -34,23 +34,23 @@ model=resnet18
 # dataset=esc
 # model=escnet
 
-# dataset=flash
-# model=flashnet
+dataset=flash
+model=flashnet
 
 
-teacher=cifar10-resnet18-kernel-npv0.pt
+# teacher=cifar10-resnet18-kernel-npv0.pt
 
 # teacher=cifar100-wrn28-kernel-npv0.pt
 
 # teacher=esc-escnet-kernel-npv0.pt
 
-# teacher=flash-flashnet-kernel-npv0.pt
+teacher=flash-flashnet-kernel-npv0.pt
 
 
 # teacher=''
 # 
 # LOAD MODEL YAPARKEN USTTEKINI KOYMAYI UNUTMA, -lm yi koy
-
+# -lm ${teacher} \
 
 # -np config/${model}-$2.yaml
 
@@ -59,7 +59,6 @@ prune_finetune() {
     save_name=${dataset}-${model}-$5-np$2-pr$4-lcm$3
     # save_name=${dataset}-${model}-$5-np$2-vers${version}-pr$4-lcm$3-lm${teacher}
     python -m source.core.run_partition -cfg config/${dataset}.yaml \
-        -lm ${teacher} \
         -mf ${save_name}.pt \
         --device $1 \
         -np ${num_partitions} \
