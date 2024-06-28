@@ -1,15 +1,23 @@
 #!/bin/bash
 
-cuda_device=1
+cuda_device=2
 yaml_version=0 # meaning no yaml file is used, num_partitions=2,4,8 is used
+
+
+# Prune ratios and num_partitions, should be selected in these combinations given:
 
 # prune_ratio=0.5
 # num_partitions=2
+
 prune_ratio=0.75
 num_partitions=4
+
 # prune_ratio=0.875
 # num_partitions=8
 
+
+
+# For yaml file selection, not used anymore. Old parameter was '-np config/${model}-$2.yaml':
 
 # yaml_version=1
 # prune_ratio=0.5
@@ -23,36 +31,32 @@ num_partitions=4
 
 
 
-
+# Dataset and model selections, should be selected in these combinations given:
 
 # dataset=cifar10
 # model=resnet18
 
-# dataset=cifar100
-# model=wrn28
+dataset=cifar100
+model=wrn28
 
 # dataset=esc
 # model=escnet
 
-dataset=flash
-model=flashnet
+# dataset=flash
+# model=flashnet
 
+
+# Select teacher model with respect to the dataset and model:
 
 # teacher=cifar10-resnet18-kernel-npv0.pt
-
-# teacher=cifar100-wrn28-kernel-npv0.pt
-
+teacher=cifar100-wrn28-kernel-npv0.pt
 # teacher=esc-escnet-kernel-npv0.pt
+# teacher=flash-flashnet-kernel-npv0.pt
 
-teacher=flash-flashnet-kernel-npv0.pt
 
-
-# teacher=''
-# 
-# LOAD MODEL YAPARKEN USTTEKINI KOYMAYI UNUTMA, -lm yi koy
+# Put this below as a parameter in order to avoid pre-training, and use a teacher model:
 # -lm ${teacher} \
 
-# -np config/${model}-$2.yaml
 
 prune_finetune() {
     st=$5
@@ -72,18 +76,4 @@ prune_finetune() {
 }
 
 prune_finetune "cuda:${cuda_device}" v${yaml_version} 0.001 ${prune_ratio} kernel
-
-
-#pretrainli yaparsan -lm i commentleyip, teacher='' olmasina gerek yok btw (cunku teacher i kullanan yok -lm haric), 
-#model adi = cifar10-resnet18-kernel-npv2-versx.pt, log u : cifar10-resnet18-kernel-npv2-versx-pr0.75-lcm0.001.out
-#sonra pruned, ondan sonra finetuned model adi = cifar10-resnet18-kernel-npv2-versx-pr0.75-lcm0.001.pt
-
-# lm olunca , teacher=cifar10-resnet18-teacher.pt, model adi = cifar10-resnet18-kernel-npv2-versx-pr0.875-lcm0.001.pt
-# log u = cifar10-resnet18-kernel-npv2-vers0-pr0.875-lcm0.001.out
-
-
-
-
-# cifar10-resnet18 in pretrain i pr0.75-lcm0.001'de yapildi, cifar10-resnet18-kernel-npv2-vers2-pr0.75-lcm0.001.out'da logu, 
-# digerleri full -lm, pr0.875-lcm0.001 gibi
 

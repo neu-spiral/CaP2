@@ -44,17 +44,8 @@ def partition_generator(configs, model):
     
     # setup prune ratio
     pr, configs['prune_ratio'] = configs['prune_ratio'], {}
-    # print(f'pr: {pr}')
-    # print(f'prune ratio: {configs["prune_ratio"]}')
-    # print(f'num partition: {num_partition}')
-    # print(f'ratio partition: {ratio_partition}')
-    # print(f'map partition: {map_partition}')
     for name, num in num_partition.items():
         ratio = ratio_partition[name]
-        # print(f'ratio: {ratio}')
-        # print(f'num: {num}')
-        # print(f'sayi: {1 - sum(r**2 for r in ratio) / sum(ratio)**2}')
-
         configs['prune_ratio'][name] = 1 - sum(r**2 for r in ratio) / sum(ratio)**2
         #configs['prune_ratio'][name] = pr
         
