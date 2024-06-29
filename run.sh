@@ -36,25 +36,25 @@ num_partitions=4
 # dataset=cifar10
 # model=resnet18
 
-dataset=cifar100
-model=wrn28
+# dataset=cifar100
+# model=wrn28
 
 # dataset=esc
 # model=escnet
 
-# dataset=flash
-# model=flashnet
+dataset=flash
+model=flashnet
 
 
 # Select teacher model with respect to the dataset and model:
 
 # teacher=cifar10-resnet18-kernel-npv0.pt
-teacher=cifar100-wrn28-kernel-npv0.pt
+# teacher=cifar100-wrn28-kernel-npv0.pt
 # teacher=esc-escnet-kernel-npv0.pt
-# teacher=flash-flashnet-kernel-npv0.pt
+teacher=flash-flashnet-kernel-npv0.pt
 
 
-# Put this below as a parameter in order to avoid pre-training, and use a teacher model:
+# Put this below as a parameter in order to avoid pre-training, and use a teacher model. If not, pre-training will be performed:
 # -lm ${teacher} \
 
 
