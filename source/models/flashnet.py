@@ -81,7 +81,8 @@ class CameraNet(nn.Module):
                 self.pool1 = nn.MaxPool2d((2,2))
                 self.pool2 = nn.MaxPool2d((3, 3), padding=1)
 
-                self.hidden1 = nn.Linear(864, 512)
+                # self.hidden1 = nn.Linear(864, 512)
+                self.hidden1 = nn.Linear(3424, 512)
                 self.hidden2 = nn.Linear(512, 256)
                 self.hidden3 = nn.Linear(256, 256)
                 self.out = nn.Linear(256, output_dim)  # 128

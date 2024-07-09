@@ -22,7 +22,8 @@ def get_model_from_code(configs):
     
     if configs['data_code'] == 'flash':
         modelA = CoordNet(input_dim=2, output_dim=num_classes)
-        modelB = CameraNet(input_dim=90, output_dim=num_classes)
+        # modelB = CameraNet(input_dim=90, output_dim=num_classes)
+        modelB = CameraNet(input_dim=360, output_dim=num_classes)
         modelC = LidarNet(input_dim=20, output_dim=num_classes)
         print("FREEZING THE WEIGHTS BEFORE FUSION LAYERS")
         for c in modelA.children():
@@ -49,7 +50,8 @@ def get_input_from_code(configs):
     device = configs["device"]
     if configs['data_code'] == 'flash':
         input_shape = [(2, 1),
-                       (90, 160, 3),
+                    #    (90, 160, 3),
+                       (360, 640, 3),
                        (20, 20, 20),]
     elif configs['data_code'] == 'esc':
         input_shape = [(3, 266, 320) for _ in range(5)]

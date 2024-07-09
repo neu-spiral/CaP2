@@ -204,6 +204,9 @@ def get_esc_data(data_folder_path, batch_size=64):
         xtrain += (fetch_esc_data(train_input),)
         xtest += (fetch_esc_data(test_input),)
 
+        ytrain = np.concatenate((ytrain, train_label))
+        ytest = np.concatenate((ytest, test_label))
+
     # for i in tqdm(range(len(data_train)-1)):
     #     xtrain += (fetch_esc_data(data_train[i]),)
     #     xtest += (fetch_esc_data(data_test[i]),)
