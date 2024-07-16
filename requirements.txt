@@ -1,0 +1,24 @@
+certifi==2024.2.2
+charset-normalizer==3.3.2
+colorama==0.4.6
+doqu==0.28.2
+idna==3.7
+joblib==1.4.2
+numpy==1.26.4
+pillow==10.3.0
+python-dateutil==2.4.2
+pytz==2015.7
+PyYAML==6.0.1
+requests==2.31.0
+scikit-learn==1.4.2
+scipy==1.13.0
+six==1.16.0
+threadpoolctl==3.5.0
+torch==1.13.1
+torchaudio==0.13.1
+torchsummary==1.5.1
+torchvision==0.14.1
+tqdm==4.66.4
+tsheets @ git+https://github.com/TSheetsTeam/api_python.git@301666970a2b70bb43b712923b8e48c412fda13a
+typing_extensions==4.11.0
+urllib3==2.2.1

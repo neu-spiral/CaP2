@@ -291,6 +291,9 @@ def test_partition(model, partition):
                 for j in range(partition[name]['num']):
                     if i==j: continue
                     if len(shape) > 2:
+                        # None is necessary here to keep numpy array after sum 
+                        # TODO: double check we arent skipping any channels. There are 5 elements in partition[name]['channel_id'] for some reason but only iterate through 4
+                        # counts the number of feature maps communicated from 1 partition to another. TODO: double check this is correct. Shouldnt the sum across out channels be removed? # feature maps communicated should be = C_in*C_out not = C_in 
                         each = np.sum(np.sum(weight_select[partition[name]['filter_id'][i][:,None],partition[name]['channel_id'][j]], axis=0) != 0)
                     else:
                         each = np.sum((weight_select[partition[name]['filter_id'][i][:,None],partition[name]['channel_id'][j]]) != 0)
@@ -309,7 +312,8 @@ def test_partition(model, partition):
             total_max_comm_interp += max(comms_interp)
             total_params += kernels*kernel_size
             
-            print("{}: params:{}, params-intrap:{}, params-interp:{}, interp-k:{}, interp-k(select):{}, max-interp-k(select):{}, outsize:{}, total-interp-comm:{}, max-interp-comm:{}".format(name, kernels*kernel_size, intra_weight*kernel_size, interpk_select*kernel_size, interpk, interpk_select, max(interps), outsize, sum(comms_interp), max(comms_interp)))
+            print("{}:   params:{},           params-intrap:{},         params-interp:{},           interp-k:{},    interp-k(select):{},   max-interp-k(select):{},     outsize:{}, total-interp-comm:{}, max-interp-comm:{}".format( \
+                   name, kernels*kernel_size, intra_weight*kernel_size, interpk_select*kernel_size, interpk,        interpk_select,        max(interps),                outsize,    sum(comms_interp),    max(comms_interp)))
             print(comms_interp)
             
     print("---------------------------------------------------------------------------")
