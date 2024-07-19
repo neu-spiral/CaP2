@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cuda_device=2
+cuda_device=1
 yaml_version=0 # meaning no yaml file is used, num_partitions=2,4,8 is used
 
 

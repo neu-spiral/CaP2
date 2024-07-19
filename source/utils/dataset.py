@@ -33,7 +33,8 @@ def get_dataset_from_code(code, batch_size):
         train_loader, test_loader = get_esc_data(batch_size=batch_size,
             data_folder_path='/raid/yarkin/cap/data/ImageDataset')
     else:
-        raise ValueError("Unknown data type : [{}] Impulse Exists".format(data_name))
+        # raise ValueError("Unknown data type : [{}] Impulse Exists".format(data_name))
+        raise ValueError("Unknown data type : [{}] Impulse Exists".format(code))
 
     return train_loader, test_loader
 
