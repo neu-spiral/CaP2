@@ -28,12 +28,13 @@ def get_dataset_from_code(code, batch_size):
             data_folder_path=os.path.join(dataset_root, 'cifar100-data'))
     elif code == 'flash':
         train_loader, test_loader = get_flash_data(batch_size=batch_size,
-            data_folder_path='/home/batool/FL/data_half_half_size')
+            data_folder_path='/raid/yarkin/cap/data/FLASH_Dataset_3_Processed')
     elif code == 'esc':
         train_loader, test_loader = get_esc_data(batch_size=batch_size,
-            data_folder_path='/mnt/WDMyBook/tong/ESC/')
+            data_folder_path='/raid/yarkin/cap/data/ImageDataset')
     else:
-        raise ValueError("Unknown data type : [{}] Impulse Exists".format(data_name))
+        # raise ValueError("Unknown data type : [{}] Impulse Exists".format(data_name))
+        raise ValueError("Unknown data type : [{}] Impulse Exists".format(code))
 
     return train_loader, test_loader
 
@@ -161,15 +162,55 @@ def get_esc_data(data_folder_path, batch_size=64):
         (torch.utils.data.DataLoader): train loader 
         (torch.utils.data.DataLoader): test loader
     '''
-    with open (data_folder_path + 'esc.pkl','rb') as handle:
-        data = pickle.load(handle)
-    data_train, data_test = data['train'], data['test']
+
+    file_names = ['ESC1', 'ESC2', 'ESC3', 'ESC4', 'ESC5']
+    selections = ['Radar', 'NoRadar']
+    frame_count = 500
+
+    # with open (data_folder_path + 'esc.pkl','rb') as handle:
+    #     data = pickle.load(handle)
+    # data_train, data_test = data['train'], data['test']
     
     xtrain,xtest = (),()
-    ytrain,ytest = data_train[-1],data_test[-1]
-    for i in tqdm(range(len(data_train)-1)):
-        xtrain += (fetch_esc_data(data_train[i]),)
-        xtest += (fetch_esc_data(data_test[i]),)
+    ytrain,ytest = (),()
+    # ytrain,ytest = data_train[-1],data_test[-1]
+
+    for file_name in file_names:
+        train_input, test_input = [], []
+        train_label, test_label = np.array([]), np.array([])
+        for selection in selections:
+            print('file_name, selection:', file_name, selection)
+            if selection == 'Radar':
+                frames_total = np.random.permutation(np.arange(1, int(frame_count/2) + 1))
+            else:
+                frames_total = np.random.permutation(np.arange(int(frame_count/2) + 1 ,frame_count + 1))
+            frames_train = frames_total[:int(frames_total.shape[0]*0.8)]
+            frames_test = frames_total[int(frames_total.shape[0]*0.8):]
+            # name the paths in format of Signals_ESC4_frame_498_NoRadar.jpg
+            paths_train = [data_folder_path + '/Signals_' + file_name + '_frame_' + str(i) + '_' + selection + '.jpg' for i in frames_train]
+            paths_test = [data_folder_path + '/Signals_' + file_name + '_frame_' + str(i) + '_' + selection + '.jpg' for i in frames_test]
+            print(len(paths_train))
+            print(len(paths_test))
+
+            train_input = train_input + paths_train
+            test_input = test_input + paths_test
+
+            if selection == 'Radar':
+                train_label = np.concatenate((train_label, np.ones(len(paths_train))))
+                test_label = np.concatenate((test_label, np.ones(len(paths_test))))
+            else:
+                train_label = np.concatenate((train_label, np.zeros(len(paths_train))))
+                test_label = np.concatenate((test_label, np.zeros(len(paths_test))))
+
+        xtrain += (fetch_esc_data(train_input),)
+        xtest += (fetch_esc_data(test_input),)
+
+        ytrain = np.concatenate((ytrain, train_label))
+        ytest = np.concatenate((ytest, test_label))
+
+    # for i in tqdm(range(len(data_train)-1)):
+    #     xtrain += (fetch_esc_data(data_train[i]),)
+    #     xtest += (fetch_esc_data(data_test[i]),)
     
     params = {'batch_size': batch_size,
               'shuffle': True,
@@ -280,14 +321,24 @@ class FlashDataLoader(object):
 def fetch_flash_data(data_paths,modality,key):   # per cat for now, need to add per epside for FL part
     first = True
     for l in tqdm(data_paths):
-        randperm = np.load(l+'/ranperm.npy')
+        # open_file = open_npz(l+'/'+modality+'.npz',key)
+        # print('open_file',open_file.shape)
+        # print('l',l)
+        # print('modality',modality)
+        # print(open_file)
+        
+        # randperm = np.load(l+'/ranperm.npy')
         try:
             open_file = open_npz(l+'/'+modality+'.npz',key)
+            randfile = np.arange(open_file.shape[0])
+            randperm = np.random.permutation(randfile)
             train_data = np.concatenate((train_data, open_file[randperm[:int(0.8*len(randperm))]]),axis = 0)
             validation_data = np.concatenate((validation_data, open_file[randperm[int(0.8*len(randperm)):int(0.9*len(randperm))]]),axis = 0)
             test_data = np.concatenate((test_data, open_file[randperm[int(0.9*len(randperm)):]]),axis = 0)
         except NameError:
             open_file = open_npz(l+'/'+modality+'.npz',key)
+            randfile = np.arange(open_file.shape[0])
+            randperm = np.random.permutation(randfile)
             train_data = open_file[randperm[:int(0.8*len(randperm))]]
             validation_data = open_file[randperm[int(0.8*len(randperm)):int(0.9*len(randperm))]]
             test_data = open_file[randperm[int(0.9*len(randperm)):]]

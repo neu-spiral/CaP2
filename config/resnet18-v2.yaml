@@ -1,7 +1,7 @@
 
 # define partitions for your network
 bn_partitions:
-    - 1
+    - 4
     - 4
     - 4
     - 4
@@ -12,7 +12,7 @@ bn_partitions:
     - 4
 partitions:
    inputs:
-     - [1,1,1,1,1]
+     - [1,1,1,1]
    conv1.weight:
      - [1,1,1,1]
    layer1.0.conv1.weight:

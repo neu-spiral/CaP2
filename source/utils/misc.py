@@ -22,7 +22,8 @@ def get_model_from_code(configs):
     
     if configs['data_code'] == 'flash':
         modelA = CoordNet(input_dim=2, output_dim=num_classes)
-        modelB = CameraNet(input_dim=90, output_dim=num_classes)
+        # modelB = CameraNet(input_dim=90, output_dim=num_classes)
+        modelB = CameraNet(input_dim=360, output_dim=num_classes)
         modelC = LidarNet(input_dim=20, output_dim=num_classes)
         print("FREEZING THE WEIGHTS BEFORE FUSION LAYERS")
         for c in modelA.children():
@@ -49,7 +50,8 @@ def get_input_from_code(configs):
     device = configs["device"]
     if configs['data_code'] == 'flash':
         input_shape = [(2, 1),
-                       (90, 160, 3),
+                    #    (90, 160, 3),
+                       (360, 640, 3),
                        (20, 20, 20),]
     elif configs['data_code'] == 'esc':
         input_shape = [(3, 266, 320) for _ in range(5)]
@@ -100,7 +102,7 @@ def set_optimizer(configs, model, train_loader, opt, lr, epochs):
     # optimizer
     optimizer_init_lr = configs['warmup_lr'] if configs['warmup'] else lr
     if opt == 'sgd':
-        optimizer = torch.optim.SGD(model.parameters(), optimizer_init_lr, momentum=0.9, weight_decay=5e-4)
+        optimizer = torch.optim.SGD(model.parameters(), optimizer_init_lr, momentum=0.9, weight_decay=1e-4)
         # cifar100: 5e-4; others: 1e-4
     else:
         optimizer = torch.optim.Adam(model.parameters(), optimizer_init_lr)
@@ -124,22 +126,27 @@ def set_optimizer(configs, model, train_loader, opt, lr, epochs):
         elif configs['data_code'] == 'cifar10':
             gamma=0.1
             if epochs > 150:
-                epoch_milestones = [80, 150]
+                # epoch_milestones = [80, 150]
+                epoch_milestones = [200]
             else:
-                epoch_milestones = [65, 90]
+                # epoch_milestones = [65, 90]
+                epoch_milestones = [80]
         elif configs['data_code'] == 'cifar100':
-            gamma=0.2
+            gamma=0.1
             # Adversarial Concurrent Training: Optimizing Robustness and Accuracy Trade-off of Deep Neural Networks
             if epochs > 150:
-                epoch_milestones = [60, 120, 160]
+                # epoch_milestones = [60, 120, 160]
+                epoch_milestones = [80, 200]
             else:
-                epoch_milestones = [65, 90]
+                # epoch_milestones = [65, 90]
+                epoch_milestones = [65]
         else:
             gamma=0.1
             if epochs > 150:
                 epoch_milestones = [80, 150]
             else:
                 epoch_milestones = [65, 90]
+        # gamma=1.0
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[i * len(train_loader) for i in epoch_milestones], gamma=gamma)
     #print(epochs, [i * len(train_loader) for i in epoch_milestones])
     if configs['warmup']:

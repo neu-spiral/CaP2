@@ -355,7 +355,8 @@ Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
     else:
         admm_epoch_offset = (epoch - 1) % admm_epoch
 
-        admm_step = admm_epoch / 3  # roughly every 1/3 admm_epoch.
+        admm_step = admm_epoch / (3/2)  # roughly every 2/3 admm_epoch.
+        # admm_step = admm_epoch / 3  # roughly every 1/3 admm_epoch.
 
         lr = config_dict['learning_rate'] * (0.1**(admm_epoch_offset // admm_step))
 
