@@ -360,7 +360,7 @@ def plot_layer(model, partition, layer_id=(1,), savepath=''):
                 img = Image.fromarray(weight2d).convert("RGB")
                 pixels = img.load()
                 
-                print(img.size, weight2d.shape)
+                print(f'name: {name}, img size: {img.size} weight size: {weight2d.shape}')
                 for i in range(img.size[0]): # for every pixel:
                     for j in range(img.size[1]):
                         if weight2d[j][i] == 0:
