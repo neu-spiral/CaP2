@@ -47,6 +47,7 @@ from torchsummary import summary
 
 import time
 
+from torchvision.models.feature_extraction import create_feature_extractor, get_graph_node_names
 
 def get_list_of_modules(model):
     ''' Takes in a model object and returns a list of module names in order they will be executed'''
@@ -57,6 +58,37 @@ def get_module(model, imodule):
     name, module = next((x for i,x in enumerate(model.named_modules()) if i==imodule)) 
 
     return name, module
+
+def get_layer_output(model, input_tensor, imodule):
+    ''' 
+        splits model horizontally and computes output up to layer = ilayer
+    '''
+
+    # map requested layer to layer in fx 
+    name = get_list_of_modules(model)[imodule]
+    eval_names = get_graph_node_names(model)[1]
+    index_fx = eval_names.index(name)
+    
+    # push up fx index if next module is relu or add
+    # assumes sequence of fx modules is always relu, add or relu after bn layer
+    if index_fx < len(eval_names)-1:
+        if 'add' in eval_names[index_fx+1]:
+              index_fx += 2
+        elif 'relu' in eval_names[index_fx+1]:
+              index_fx += 1
+
+    print(f'Grabbing module {eval_names[index_fx]} from fx list') # debug
+    get_layers = {
+         eval_names[index_fx] : f'layer_{imodule}'
+         }
+    
+    # get intermediate outputs 
+    extractor_model = create_feature_extractor(model,return_nodes = get_layers)
+    with torch.no_grad():
+        extractor_model.eval()
+        intermediate_out = extractor_model(input_tensor)
+        return intermediate_out[f'layer_{imodule}']
+    
 
 def split_conv_layer(module_full, input_channels):
     '''Takes a full convolution module and splits it based on input_channels
@@ -128,9 +160,9 @@ def get_residual_block_indexes(model):
         Specifically: residual block, start of residual connection, and final layer in residual block
     '''
 
-    residual_block_start = []
-    residual_connection_start = []
-    residual_block_end = []
+    residual_block_start = np.array([])
+    residual_connection_start = np.array([])
+    residual_block_end = np.array([])
     layer_names = get_list_of_modules(model)
     
     for imodule,pair in enumerate(model.named_modules()):
@@ -138,12 +170,12 @@ def get_residual_block_indexes(model):
         name = pair[0]
         if type(curr_module) == resnet.BasicBlock:
                 if hasattr(curr_module, 'shortcut') and (len(curr_module.shortcut) > 0):
-                    residual_block_start += [imodule+1]
+                    residual_block_start = np.append(residual_block_start, imodule+1)
         elif len(name) >= 8 and name[-8:] == 'shortcut':
             N_modules = len(curr_module)
             if N_modules > 0:
-                residual_connection_start += [imodule+1]
-                residual_block_end += [imodule+N_modules]
+                residual_connection_start = np.append(residual_connection_start, imodule+1)
+                residual_block_end = np.append(residual_block_end, imodule+N_modules)
     
     return residual_block_start, residual_connection_start, residual_block_end
 
@@ -156,6 +188,113 @@ def get_functional_layers(model_name):
         relu_layers = [2,7,8,13,14,20,24,28,29,35,39,43,44,50,54,58,59] 
         avg_pool_layers = [59]
         return relu_layers,avg_pool_layers
+
+def get_layer_output_legacy(model, input, ilayer):
+    ''' 
+        splits model horizontally and computes output up to layer = ilayer
+    '''
+    FULL_PRINT = 0 # print message for each layer vs just final layer
+
+    # get model name
+    if model.__class__.__name__ == 'ResNet':
+           print('TODO: fix me-- assume all resnet models are resnet 18 for now. Make lookup function?')
+           model_name = 'resnet18'
+    
+    # get info for executing residual layers
+    relu_layers,avg_pool_layers = get_functional_layers(model_name)
+    residual_block_start, residual_connection_start, residual_block_end = get_residual_block_indexes(model)
+    residual_input = {}
+    
+    with torch.no_grad():
+        for imodule in range(ilayer+1):
+            curr_name, curr_module = next((x for i,x in enumerate(model.named_modules()) if i==imodule)) 
+            if FULL_PRINT or imodule == ilayer:
+                print(curr_name)
+
+            if not(type(curr_module) in [nn.Conv2d, nn.BatchNorm2d, nn.Linear]):
+                if FULL_PRINT or imodule == ilayer:
+                        print(f'Skipping layer = {imodule} {curr_name}')
+                        
+                continue
+
+            curr_module.eval()
+
+            if imodule in residual_block_start:
+                # save input for later 
+                residual_input = {}
+                residual_input['block_in'] = input
+                if FULL_PRINT or imodule == ilayer:
+                        print('\t\t-Saving input for later...')
+            elif imodule in residual_connection_start:
+                # swap tensors
+                residual_input['block_out'] = input
+                input = residual_input['block_in'] 
+                if FULL_PRINT or imodule == ilayer:
+                        print('\t\t-Saving current input. Swapping for input saved from start of block')
+            
+            # check if this is end of residual layer block
+            if imodule in residual_block_end: # TODO: does this conditional make sense?
+                if FULL_PRINT or imodule == ilayer:
+                        print('\t\t-adding residual')
+                residual_input['res_out'] = input # save residual out for debugging 
+                input += residual_input['block_out']
+
+                # erase stored 
+                #residual_input = {}
+            
+            # move prep input for linear layer  
+            if type(curr_module) == nn.Linear:
+                input = F.avg_pool2d(input, 4)
+                input = input.view(input.size(0), -1)
+            
+            # compute model output
+            input = curr_module(input)
+
+            # apply activation function 
+            if imodule in relu_layers:
+                if FULL_PRINT or imodule == ilayer:
+                        print('Apllying ReLU')
+                input = F.relu(input)
+        
+        return input, residual_input
+
+def get_nonzero_channels(atensor, dim=1):
+    return torch.unique(torch.nonzero(atensor, as_tuple=True)[dim]) 
+
+def  compare_tensors(t1, t2, dim=1, rshape=(1,64,-1)):
+    diff = torch.abs(t1-t2)
+
+    max_diff_pin_dim = torch.max(diff.reshape(rshape), dim)
+    return max_diff_pin_dim[0]
+
+
+def compare_outputs(full_output, horz_output):
+    ''' 
+        Used for debugging output differences b/w full and split models 
+    '''
+    diff_output = torch.abs(horz_output - full_output)
+
+    N_batch = horz_output.shape[0]
+
+    print('Max diff:')
+    print(torch.max(torch.reshape(diff_output, (N_batch, -1)), dim=1)[0])
+    #plt.hist(diff_output.reshape((-1,)))
+    #plt.show()
+
+    max_by_Cout = torch.max(torch.abs(diff_output.reshape((1,full_output.shape[1],-1))), dim=2)
+
+    print()
+    print(max_by_Cout[0])
+    print(get_nonzero_channels(max_by_Cout[0]))
+
+
+    # get C_out with zero and non-zero diff
+    nonzero_Cout = get_nonzero_channels(horz_output)
+    failing_Cout = nonzero_Cout[torch.isin(nonzero_Cout, get_nonzero_channels(max_by_Cout[0]))]
+    passing_Cout = nonzero_Cout[torch.isin(nonzero_Cout, get_nonzero_channels(max_by_Cout[0])) == False]
+    print() 
+    print(f'failing Cout = {failing_Cout}  (len = {len(failing_Cout)})')
+    print(f'passing Cout = {passing_Cout}  (len = {len(passing_Cout)})')
 
 def main():
     # setup config
