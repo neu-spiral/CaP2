@@ -261,7 +261,7 @@ def get_layer_output_legacy(model, input, ilayer):
 def get_nonzero_channels(atensor, dim=1):
     return torch.unique(torch.nonzero(atensor, as_tuple=True)[dim]) 
 
-def  compare_tensors(t1, t2, dim=1, rshape=(1,64,-1)):
+def compare_tensors(t1, t2, dim=1, rshape=(1,64,-1)):
     diff = torch.abs(t1-t2)
 
     max_diff_pin_dim = torch.max(diff.reshape(rshape), dim)
