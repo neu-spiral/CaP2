@@ -147,6 +147,7 @@ def split_bn_layer(module_full, input_channels):
 
     if not split_layer.bias == None:
             split_layer.bias = torch.nn.Parameter(module_full.bias.index_select(0, input_channels))
+    return split_layer
 
 def split_linear_layer(module_full, input_channels):
     '''Takes a full linear module and splits it based on input_channels
@@ -158,7 +159,7 @@ def split_linear_layer(module_full, input_channels):
     '''
     N_in = len(input_channels)
     split_layer = nn.Linear(N_in, 
-        split_layer.weight.shape[0])
+        module_full.weight.shape[0])
 
     # write parameters to split layer 
     split_layer.weight = torch.nn.Parameter(module_full.weight.index_select(1, input_channels))
@@ -166,6 +167,7 @@ def split_linear_layer(module_full, input_channels):
     # TODO: double check bias is applied correctly
     if not split_layer.bias == None:
             split_layer.bias = split_layer.bias
+    return split_layer
 
 def get_residual_block_indexes(model):
     ''' get indexes of important points in model execution for residual blocks/shortcut connections.
@@ -177,7 +179,7 @@ def get_residual_block_indexes(model):
     residual_block_end = np.array([])
     layer_names = get_graph_node_names(model)[1]
     
-    block_num = ''
+    block_num = '-1'
     imodule = 0
     for name in layer_names:
 
@@ -186,7 +188,7 @@ def get_residual_block_indexes(model):
         if len(tmp) == 1:
            # assume belongs to no large layer block e.g. start of the model 
            tmp_layer_type = tmp[0]
-           tmp_block_num = -1
+           tmp_block_num = '-1'
         else:
             # unpack 
             tmp_large_layer = tmp[0]
@@ -196,14 +198,14 @@ def get_residual_block_indexes(model):
         # detect when a new block is entered and save the index 
         if not (tmp_block_num == block_num):
             block_num = tmp_block_num
-            block_start_index = imodule 
+            residual_block_start = np.append(residual_block_start, imodule)
 
         # detect first shortcut layer
         if 'shortcut.0' in name:
             residual_connection_start = np.append(residual_connection_start, imodule)
 
         # detect residual summing 
-        if '.add' in name :
+        if '.add' in name:
             residual_block_end = np.append(residual_block_end, imodule)
 
         imodule += 1
@@ -253,11 +255,11 @@ def combine_inputs(input_struct, num_machines, imach):
     curr_input = False 
     rx_count = 0
     for i in range(num_machines):
-        if not input[imach][i] == None:
+        if not input_struct[imach][i] == None:
             if not torch.is_tensor(curr_input):
-                curr_input = input[imach][i] # initialize curr_input with first input tensor 
+                curr_input = input_struct[imach][i] # initialize curr_input with first input tensor 
             else:
-                curr_input += input[imach][i]
+                curr_input += input_struct[imach][i]
                 rx_count += 1
     return curr_input
 
