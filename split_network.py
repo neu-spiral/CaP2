@@ -59,6 +59,25 @@ def get_module(model, imodule):
 
     return name, module
 
+def execute_layer(model, input, layer):
+    '''  get the horizontal output from model at layer using input '''
+
+    layer = get_current_module(model, layer)
+
+    layer.eval()
+    with torch.no_grad():
+        return layer(input) 
+
+def replace_all_tensors(input, val):
+    ''' takes in a nested list of tensors and replaces the non-zero values of those tensors. For debugging split layer '''
+
+    for out in input:
+        for el in input:
+            if torch.is_tensor(el):
+                el[not (el == 0)] = val
+    
+    return input
+
 def get_current_module(model, imodule):
     '''  
     gets current module using fx indexing
@@ -79,8 +98,7 @@ def get_current_module(model, imodule):
             else:
                 tmp = getattr(tmp,lname)
         return tmp
-            
-                    
+                         
 
 def get_layer_output(model, input_tensor, imodule):
     ''' 
@@ -159,14 +177,16 @@ def split_linear_layer(module_full, input_channels):
     '''
     N_in = len(input_channels)
     split_layer = nn.Linear(N_in, 
-        module_full.weight.shape[0])
+        module_full.weight.shape[0], 
+        bias=False)
 
     # write parameters to split layer 
     split_layer.weight = torch.nn.Parameter(module_full.weight.index_select(1, input_channels))
 
-    # TODO: double check bias is applied correctly
-    if not split_layer.bias == None:
-            split_layer.bias = split_layer.bias
+    # TODO: current implementation assumes Linear is final layer and bias is handled separately 
+    #if not split_layer.bias == None:
+    #       split_layer.bias = module_full.bias
+    
     return split_layer
 
 def get_residual_block_indexes(model):
@@ -220,6 +240,32 @@ def compare_tensors(t1, t2, dim=1, rshape=(1,64,-1)):
     max_diff_pin_dim = torch.max(diff.reshape(rshape), dim)
     return max_diff_pin_dim[0]
 
+def get_output_at_each_layer(model, input_tensor):
+    ''' gets the true model output for all layers in the model '''
+
+    layer_names_fx = get_graph_node_names(model)[1]
+    total_layers_fx = len(layer_names_fx)
+
+    # get list of intermediate outputs 
+    get_horz_out = {}
+    for aname in layer_names_fx:
+        get_horz_out[aname] = aname
+
+    extractor_model = create_feature_extractor(model,return_nodes = get_horz_out)
+    with torch.no_grad():
+        extractor_model.eval()
+        horz_output = extractor_model(input_tensor)
+    
+    size_LUT = {}
+    index = 0
+    for out_name in horz_output:
+        if torch.is_tensor(horz_output[out_name]):
+            size_LUT[out_name] = horz_output[out_name].shape
+        else:
+            size_LUT[out_name] =  [None]
+        index += 1
+
+    return horz_output, size_LUT
 
 def compare_outputs(full_output, horz_output):
     ''' 
@@ -230,7 +276,8 @@ def compare_outputs(full_output, horz_output):
     N_batch = horz_output.shape[0]
 
     print('Max diff:')
-    print(torch.max(torch.reshape(diff_output, (N_batch, -1)), dim=1)[0])
+    max_diff= torch.max(torch.reshape(diff_output, (N_batch, -1)), dim=1)[0]
+    print(max_diff)
     #plt.hist(diff_output.reshape((-1,)))
     #plt.show()
 
@@ -249,6 +296,8 @@ def compare_outputs(full_output, horz_output):
     print(f'failing Cout = {failing_Cout}  (len = {len(failing_Cout)})')
     print(f'passing Cout = {passing_Cout}  (len = {len(passing_Cout)})')
 
+    return max_diff.item(), max_by_Cout
+
 def combine_inputs(input_struct, num_machines, imach):
     ''' helper to gather input tensors and add them  '''
     # combine inputs from machines
@@ -259,9 +308,24 @@ def combine_inputs(input_struct, num_machines, imach):
             if not torch.is_tensor(curr_input):
                 curr_input = input_struct[imach][i] # initialize curr_input with first input tensor 
             else:
-                curr_input += input_struct[imach][i]
+                curr_input = curr_input + input_struct[imach][i]
                 rx_count += 1
     return curr_input
+
+def combine_all_inputs(input_struct, num_machines):
+    ''' helper to gather input tensors and add them  '''
+    # combine inputs from machines
+    combined_input = False 
+
+    for i in range(num_machines):
+        for j in range(num_machines):
+            if not input_struct[j][i] == None:
+                if not torch.is_tensor(combined_input):
+                    combined_input = input_struct[j][i] # initialize curr_input with first input tensor 
+                else:
+                    combined_input = combined_input + input_struct[j][i]
+                    
+    return combined_input
 
 def main():
     print()
