@@ -1,7 +1,7 @@
 from source.utils import io
 
 from ..utils.misc import get_model_from_code
-from split_network import *
+from ..utils.split_network import *
 
 import torch
 import torch.nn.functional as F
