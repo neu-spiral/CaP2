@@ -327,6 +327,7 @@ def combine_all_inputs(input_struct, num_machines):
                     
     return combined_input
 
+
 def main():
     print()
 
