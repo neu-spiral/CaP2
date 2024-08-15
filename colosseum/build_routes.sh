@@ -207,7 +207,8 @@ for ((i=0; i<num_sorted_entries; i++)); do
       done
       sleep 2
     fi
-    gnome-terminal -- bash -c "sshpass -p '$psswrd' ssh '$prefixed_number' 'cd /root/networks-for-ai && python3 inferenceUE_CLI.py --host_previous $prev_host --port_previous $prev_port --host_next $next_host --port_next $next_port; bash'"
+    #gnome-terminal -- bash -c "sshpass -p '$psswrd' ssh '$prefixed_number' 'cd /root/networks-for-ai && python3 inferenceUE_testing.py --host_previous $prev_host --port_previous $prev_port --host_next $next_host --port_next $next_port; bash'"
+    #mintty -h always -- bash -c "sshpass -p '$psswrd' ssh '$prefixed_number' 'cd /root/networks-for-ai && python3 inferenceUE_testing.py --host_previous $prev_host --port_previous $prev_port --host_next $next_host --port_next $next_port; bash'"
 #  elif [[ $layer == 18 ]]; then
 #    echo "Starting layer $layer..."
 #    pids=$(sshpass -p "$psswrd" ssh "$prefixed_number" 'ps aux | grep "python3 inferenceNode" | grep -v grep | awk "{print \$2}"')
