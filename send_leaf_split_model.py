@@ -1,0 +1,43 @@
+import json
+import argparse
+import torch 
+
+from source.SplitModelNetworking import leaf
+from source.core import engine
+
+def prep_data(tensor):
+    '''
+        Prepare input tensors to model 
+    '''
+    return {
+        'node' : -1,
+        'layer' : 0,
+        'tensor' : tensor, 
+        'Cin' : list(range(tensor.shape(1)))
+    }
+
+
+def main():
+    counter = 0
+    parser = argparse.ArgumentParser(description="Leaf node data collector and sender.")
+    parser.add_argument("config_file", type=str, help="Path to the configuration file.")
+    args = parser.parse_args()
+
+    # Load configuration
+    with open(args.config_file, "r") as f:
+        config = json.load(f)
+
+    servers = [(srv['host'], srv['port']) for srv in config['servers']]
+
+    tensor = torch.rand((1,3,32,32)) # single image from cifar 
+
+    # 3 send each server different data 
+    for iserver in range(len(servers)):
+        processed_data = prep_data(tensor)
+
+        counter = 0
+        while True:
+            leaf.send_to_servers(processed_data,[servers[iserver]])     
+            counter += 1
+            if counter > 3:
+                break

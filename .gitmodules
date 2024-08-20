@@ -1,0 +1,3 @@
+[submodule "source/SplitModelNetworking"]
+	path = source/SplitModelNetworking
+	url = https://github.com/neu-spiral/SplitModelNetworking.git

@@ -9,3 +9,4 @@
 /source/utils/calculate_flops/__pycache__/
 /source/utils/calculate_flops/ptflops/__pycache__/
 /source/utils/calculate_flops/thop/__pycache__/
+.vscode
