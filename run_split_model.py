@@ -50,24 +50,15 @@ def config_setup(num_nodes, model_file_path):
 
     return configs
 
-def final_routine(model_manager, input_tensor):
-    '''
-        Handle final layer output
-    '''
-
-    print('FINISHED MODEL EXECUTION')
-
-    if model_manager.machine == 0: # TODO: replace this with logic for root node. ATM assumes machine 0 is sent final outputs
-        vertical_output = model_manager.add_bias_to_linear()
-
-        with torch.no_grad():
-            model_manager.model.eval()
-            full_output = model_manager.model(input_tensor)
-        
-        split_network.compare_outputs(full_output, vertical_output)
-
 
 def main():
+    ''' 
+        TODO: cases to handle:
+        - FC network, some connections are more important than others, continue even if nodes dont send anything
+        -
+    
+    '''
+
     parser = argparse.ArgumentParser(description="Server application with configurable settings.")
     parser.add_argument('ip_map_file', type=str, help='Path to ip map JSON file')
     parser.add_argument('network_graph_file', type=str, help='Path to network graph JSON file')
@@ -122,7 +113,7 @@ def main():
                 collected_data = node.collect_data_from_server(client_data_queue, 1, model_manager.current_layer, collected_for_layer=update_count)
             else:
                 first_pass = False
-                collected_data = node.collect_data_from_server(client_data_queue, 1, model_manager.current_layer, collected_for_layer=update_count)
+                collected_data = node.collect_data_from_server(client_data_queue, required_clients, model_manager.current_layer, collected_for_layer=update_count)
 
 
             if collected_data:
@@ -137,7 +128,7 @@ def main():
                 model_manager.process_input(collected_data) # update local tensor with inputs 
 
                 if model_manager.current_layer == model_manager.total_layers_fx+1:
-                    final_routine(model_manager)
+                    model_manager.final_routine()
                     server_thread.join()  # Wait for the server thread to finish
                     return True # end execution
                 else:

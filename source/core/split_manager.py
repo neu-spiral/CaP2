@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torchvision.models.feature_extraction import create_feature_extractor, get_graph_node_names
 import numpy as np
 
+
 class SplitManager:
     """
     Each thread runs a SplitManager object to handle I/O for it's portion of the vertically split model 
@@ -15,6 +16,7 @@ class SplitManager:
     - load only necessary split layers (either on CPU or GPU) for this thread before executing anything. Replace "get_current_module" on line ~112 and remove layer splitting 
     - change implementation to handle and use smallest tensor possible no matter bn or conv (currently bn output with be a tensor with dim=1 be larger than the required C_out for the split layer)
     - find another way to create layer_output_size_LUT and remove input_tensor and get_output_at_each_layer from constructor 
+    - assign machines the final layer they have to compute 
     """
 
     def __init__(self, configs, machine, N_machines, input_tensor, debug=False):
@@ -51,6 +53,7 @@ class SplitManager:
 
         # residual connections/block related
         self.layer_names_fx =  get_graph_node_names(model)[1]
+        self.layer_names_fx.append('FINAL_MODEL_OUTPUT')
         self.total_layers_fx = len(self.layer_names_fx)
         self.residual_input = {}
         self.residual_block_start, self.residual_connection_start, self.residual_block_end = split_network.get_residual_block_indexes(self.model)
@@ -59,6 +62,7 @@ class SplitManager:
         self.split_module_names = list(self.configs['partition'].keys())
         self.current_layer = self.get_machine_starting_layer() # layer that needs to be executed (current_tensor is always the input to this layer), corresponds to index in self.layer_names_fx
         # TODO: add logic for detecting layer a machine should start at 
+        self.final_layer = self.get_machine_ending_layer()
 
         # debugging/ verification
         # layer_output_size_LUT 
@@ -77,6 +81,12 @@ class SplitManager:
 
     def get_layer_name(self, layer):
         return self.layer_names_fx[layer]
+
+    def is_done(self):
+        if self.current_layer > self.final_layer:
+            return 1
+        else:
+            return 0
 
     @staticmethod
     def combine_all_dict_inputs(input_size, input_list, layer, device='cpu', dtype=torch.float32):
@@ -122,16 +132,33 @@ class SplitManager:
 
         return -1
 
+    def get_machine_ending_layer(self):
+        ''' 
+            determine where to end calucation
+        '''
+
+        layer = -1
+        for i in range(self.current_layer, self.total_layers_fx):
+            layer_name = self.layer_names_fx[i] + '.weight'
+
+            if layer_name in self.split_module_names:
+                if len(self.configs['partition'][layer_name]['channel_id'][self.machine]) > 0:
+                    layer = i
+
+        return layer
+
     def execute_layers_until_comms(self):
         ''' 
             Executes split, starting at the current layer, until reaching a layer that requires input for communication
         '''
         
-        split_layer_output, do_comm = self.execute_split_layer(self.current_tensor, self.current_layer) # execute split layer
-        self.init_current_tensor(split_layer_output)
+        do_comm = False
         while not do_comm:
             split_layer_output, do_comm = self.execute_split_layer(self.current_tensor, self.current_layer) # execute split layer
             self.init_current_tensor(split_layer_output)
+
+            if self.debug and not do_comm:
+                self.check_current_tensor()
 
         return split_layer_output
 
@@ -145,28 +172,121 @@ class SplitManager:
         # debug
         #nonzero_out_tensor = torch.unique(torch.nonzero(out_tensor, as_tuple=True)[1])
 
-        # prep mask for this node
-        out_channel_array = torch.arange(out_tensor.shape[1]) # all indexes of full output
-        output_channels = torch.tensor(self.output_channel_map[self.machine],
-                device=self.device) # output channels assigned to this machine
-        output_channels_mask = torch.isin(out_channel_array, output_channels)
-
-        # TODO: this is inefficient, redo. Probbably need to send a tensor and some info what output channels are being sent 
-        tmp = torch.zeros(out_tensor.shape, device=self.device, dtype=self.dtype)
         if self.current_layer == self.total_layers_fx-1:
-                tmp[:,output_channels_mask] = tmp[:,output_channels_mask] + out_tensor[:,output_channels_mask]
+            self.current_tensor = out_tensor
+            self.current_layer += 1 # update layer to execute
+
+            # debug
+            if self.debug:
+                curr_layer_name = self.layer_names_fx[-1]
+                print(f'\t\t FINAL TENSOR FOR: #{self.current_layer}-{curr_layer_name}; Shape={list(self.current_tensor.shape)}')  
+                print(f'\t\t SPLIT OUTPUT: {self.current_tensor}')
+                print(f'\t\t FULL OUTPUT: {self.horz_output[self.layer_names_fx[-2]]}')
         else:
-                tmp[:,output_channels_mask] = tmp[:,output_channels_mask] + out_tensor[:,output_channels_mask,:,:]
+            # prep mask for this node
+            out_channel_array = torch.arange(out_tensor.shape[1]) # all indexes of full output
+            output_channels = torch.tensor(self.output_channel_map[self.machine],
+                    device=self.device) # output channels assigned to this machine
+            output_channels_mask = torch.isin(out_channel_array, output_channels)
 
-        # debug
-        if self.debug:
-            curr_layer_name = self.get_current_layer_name()
-            print(f'\t\t INITIALIZING CURRENT TENSOR: #{self.current_layer}-{curr_layer_name}; Shape={list(tmp.shape)}; C_in={output_channels.numpy()}')  
+            # TODO: this is inefficient, redo. Probbably need to send a tensor and some info what output channels are being sent 
+            tmp = torch.zeros(out_tensor.shape, device=self.device, dtype=self.dtype)
+            tmp[:,output_channels_mask] = tmp[:,output_channels_mask] + out_tensor[:,output_channels_mask,]
 
-        self.current_tensor = tmp
-        self.current_layer += 1 # update layer to execute
+            self.current_tensor = tmp
+            self.current_layer += 1 # update layer to execute
+
+            # debug
+            if self.debug:
+                curr_layer_name = self.get_current_layer_name()
+                print(f'\t\t INITIALIZING CURRENT TENSOR FOR: #{self.current_layer}-{curr_layer_name}; Shape={list(tmp.shape)}; C_in={output_channels.numpy()}')  
+
+
+    def get_last_partition(self):
+        '''
+            get the C_out from the previous conv layer 
+        '''
+        
+        ilayer = self.current_layer-1 # dont start on current layer 
+
+        # handle edge case at end of model execution
+        if self.current_layer == self.total_layers_fx:
+            ilayer -= 1
+        while ilayer > 0:
+            layer_name = self.get_layer_name(ilayer)+'.weight'
+            if layer_name in self.configs['partition']:
+                return self.configs['partition'][layer_name]['filter_id'][self.machine]
+            ilayer -= 1
+
+    @staticmethod
+    def compare_helper(split_output, truth_output):
+        indent_str = '\t'*2
+
+        diff_output = torch.abs(split_output - truth_output)
+
+        N_batch = split_output.shape[0]
+
+        print_str = ''
+        print_str = print_str + indent_str + 'Max diff:'
+        max_diff= torch.max(torch.reshape(diff_output, (N_batch, -1)), dim=1)[0]
+        print_str = print_str + indent_str + str(max_diff)
+        #plt.hist(diff_output.reshape((-1,)))
+        #plt.show()
+
+        max_by_Cout = torch.max(torch.abs(diff_output.reshape((1,truth_output.shape[1],-1))), dim=2)
+
+        print_str = print_str + '\n'
+        print_str = print_str + indent_str + str(max_by_Cout[0])
+        print_str = print_str + indent_str + str(split_network.get_nonzero_channels(max_by_Cout[0]))
+
+
+        # get C_out with zero and non-zero diff
+        nonzero_Cout = split_network.get_nonzero_channels(split_output)
+        failing_Cout = nonzero_Cout[torch.isin(nonzero_Cout, split_network.get_nonzero_channels(max_by_Cout[0]))]
+        passing_Cout = nonzero_Cout[torch.isin(nonzero_Cout, split_network.get_nonzero_channels(max_by_Cout[0])) == False]
+        print_str = print_str + '\n'
+        print_str = print_str + indent_str + f'failing Cout = {failing_Cout}  (len = {len(failing_Cout)})'
+        print_str = print_str + indent_str + f'passing Cout = {passing_Cout}  (len = {len(passing_Cout)})'
+
+        return max_diff, max_by_Cout, print_str
 
         
+    def check_current_tensor(self, limit=1e-4):
+        '''
+            Checks if current tensor is correct
+        '''
+
+        input_channels = self.get_last_partition()
+        if self.current_layer == self.total_layers_fx:
+            output_layer_name = self.layer_names_fx[self.current_layer-2]
+        else:
+            output_layer_name = self.layer_names_fx[self.current_layer-1]
+
+        # handle check for final layer
+        if self.current_layer == self.total_layers_fx:
+            is_final_layer = True
+        else:
+            is_final_layer = False
+
+        truth_output = self.horz_output[output_layer_name]
+        
+        if torch.is_tensor(truth_output):
+            print(f'\t\tChecking output from {output_layer_name} C_in {input_channels}: \n')
+            max_diff, max_by_Cout, print_str = SplitManager.compare_helper(self.current_tensor[:,input_channels,], truth_output[:,input_channels,])
+            print('\n\n')
+
+            if max_diff > limit or is_final_layer:
+                print('\t\tERROR:')
+                print(print_str)
+                return 0
+            else:
+                return 1 
+        else:
+            # handles "size" layer that doesnt output anything (e.g. truth_output = 1)
+            print(f'\t\tSkipping check for output {output_layer_name} (no tensor found for ref.) \n')
+            return 1
+
+
     def prep_output(self, out_tensor):
         ''' 
             Take output tensor from the split layer output and prepare outputs for sending.
@@ -228,16 +348,13 @@ class SplitManager:
                 output_element['Cin'] = communication_out_mask.tolist()
 
                 # TODO: this is inefficient, redo. Probbably need to send a tensor and some info what output channels are being sent 
-                if self.current_layer == self.total_layers_fx-1:
-                        output_element['tensor'] = out_tensor[:,communication_out_mask]
-                else:
-                        output_element['tensor'] = out_tensor[:,communication_out_mask,:,:]
+                output_element['tensor'] = out_tensor[:,communication_out_mask,]
 
                 # debug
                 if self.debug:
                     curr_layer_name = self.get_current_layer_name()
                     #print(f'\t\t Machine={self.machine}, Layer to execute = {self.current_layer}:{curr_layer_name}.')
-                    print(f'\t\t\t Prepping to send C_out {communication_out_channels} to machine {rx_mach}')
+                    print(f'\t\t Prepping to send C_out {communication_out_channels} to machine {rx_mach}')
             else:
                 output_element['is_empty'] =True
 
@@ -248,8 +365,9 @@ class SplitManager:
     def process_input(self, collected_data):
         '''
             Adds collected input from different nodes to the local current tensor  
-            Assumes self.current_tensor is the correct size for self.current_layer in model.
-            This is set in [TODO: WHERE?]
+            Assumes self.current_tensor is the correct size for self.current_layer in model
+            TODO: Implementation assumes calculation proceeds after the requisit amount of communication was received
+            TODO: assumes N_machines is always the requisit # of communications
 
             Input:
                 collected_data - (list) list of dicts with keys:
@@ -263,24 +381,45 @@ class SplitManager:
             
             Output:
                 success = 
-                     1 == added at least 1 tensor to current_tensor, or
-                    -1 == did not add any tensors
+                     1 == received the expected comms
+                     0 == did not get enough comms
+                    -1 == did not add any comms
+                    -2 == received too many comms
         '''
 
+        # TODO: update this to be dynamic
+        if self.current_layer == 1:
+            N_expected_comms = 1
+        else:
+            N_expected_comms = self.N_machines-1 
+
         success = -1
+        count = 0
         with torch.no_grad():
             for data_dict in collected_data:
-                if not data_dict['is_empty'] and data_dict['layer'] == self.current_layer -1:
+                if  data_dict['layer'] == self.current_layer -1:
                     
-                    # get input channels
-                    input_channels = torch.tensor(data_dict['Cin'],
-                            device=self.device)
+                    count += 1 # count each communication sent to this node
 
-                    # add to current tensor 
-                    # TODO: experiment with adding up on CPU first then sending to GPU vs sending over and over to GPU
-                    self.current_tensor[:, input_channels,] = data_dict['tensor'].to(self.device) + self.current_tensor.index_select(1, input_channels)
-                    success = 1
+                    if not data_dict['is_empty']:
+                        # get input channels
+                        input_channels = torch.tensor(data_dict['Cin'],
+                                device=self.device)
+
+                        # add to current tensor 
+                        # TODO: experiment with adding up on CPU first then sending to GPU vs sending over and over to GPU
+                        self.current_tensor[:, input_channels,] = data_dict['tensor'].to(self.device) + self.current_tensor.index_select(1, input_channels)
+                        success = 1
         
+        if count == 0:
+            success = -1
+        elif count < N_expected_comms:
+            success = 0
+        elif count == N_expected_comms:
+            success = 1 
+        else:
+            success = -2
+
         return success
 
     def is_comm_layer(self, layer):
@@ -299,10 +438,58 @@ class SplitManager:
             Assumes this node/machine has access to all bias weights
             TODO: find better implementation for this.
         '''
-        return self.current_tensor + split_network.get_current_module(self.model, self.current_layer).bias
+        module = split_network.get_current_module(self.model, self.current_layer-1)
+        return self.current_tensor + module.bias
 
     def get_input_size(self, layer):
         return self.layer_output_size_LUT[self.layer_names_fx[layer]]
+
+    @staticmethod
+    def get_io_for_linear(configs, layer_names_fx, N_machines, final_node, N_Cout):
+        '''
+            Linear layer output is split across machines but no data structure exists to coordinate how it is communicated and to whom
+            Creates a dictionary to determine where input and output goes
+
+            Input:
+                configs - model configuration 
+                layer_names_fx - list of layer names
+                N_machines - total number of network nodes
+                final_node - final node 
+                N_Cout - number of output channels for the entire model 
+
+            Output:
+                partition_map = {
+                    channel_id : list of len # total machines. Each element is an np array of the C_in channels associated with that machine==index,
+                    feature_id : directs all output channels to final_node
+                }
+
+        '''
+        
+        def get_last_split_Cout(configs, layer_names_fx, ilayer):
+            '''
+                get the entire C_out map from the last conv layer 
+            '''
+            ilayer = ilayer-1 # dont start on current layer 
+            while ilayer > 0:
+                layer_name = layer_names_fx[ilayer]+'.weight'
+                if layer_name in configs['partition']:
+                    return configs['partition'][layer_name]['filter_id']
+                ilayer -= 1
+
+        cout_map = []
+        for i in range(N_machines):
+            if i == final_node:
+                cout_map.append(np.arange(N_Cout))
+            else:
+                cout_map.append(np.array([]))
+
+        partition_map = {
+            "channel_id" :  get_last_split_Cout(configs, layer_names_fx, len(layer_names_fx)),
+            "filter_id" : cout_map
+        }
+        
+        return partition_map
+
 
     def execute_split_layer(self, curr_input, imodule):
         '''   
@@ -331,10 +518,12 @@ class SplitManager:
             
             # debug
             if self.debug:
-                print(f'\t\t received input channels {split_network.get_nonzero_channels(curr_input)}')
+                print(f'\t\t current input channels {split_network.get_nonzero_channels(curr_input)}')
             
             # non-comms operations 
-            if 'relu' in self.layer_names_fx[imodule]:
+            if imodule == self.total_layers_fx-1:
+                return self.final_output_routine(curr_input)
+            elif 'relu' in self.layer_names_fx[imodule]:
                 # just relu no comm necessary 
                 print('\t\t-Applying ReLU')
                 return F.relu(curr_input), False
@@ -408,27 +597,6 @@ class SplitManager:
                 self.output_channel_map = self.configs['partition'][split_param_name]['filter_id']
 
                 do_comm = True
-            elif type(curr_layer) == torch.nn.Linear and imodule == self.total_layers_fx-1:
-                # if final layer output all goes to machine 0 
-                # TODO: find better way to handle this. Also will we encounter Linear layers not at the end of the model
-                N_Cin = curr_layer.in_features
-                Cin_per_machine = N_Cin/self.N_machines
-                if Cin_per_machine % 1 > 0:
-                        print('ERROR: UNEXPECTED NUMBER OF I/O FOR LINEAR MODULE {imodule}')
-                Cin_per_machine = int(Cin_per_machine)
-                input_channels = np.arange(Cin_per_machine) + self.machine*Cin_per_machine
-                N_Cout = curr_layer.out_features 
-                self.output_channel_map = [None]*self.N_machines
-                for i in range(self.N_machines):
-                        if i == 0:
-                            # send all outputs to machine 0 for final layer
-                            # TODO: revisit this implementation choice
-                            self.output_channel_map[i] = np.arange(N_Cout) 
-                        else:
-                            self.output_channel_map[i] = np.array([])
-                input_channels = torch.tensor(input_channels, device=self.device)
-
-                do_comm = True
             else:
                 # for batch normal, and functional passes through the code
                 # TODO: address the following assumptions:
@@ -474,27 +642,19 @@ class SplitManager:
             if self.debug:
                 exec_layer_name = self.get_layer_name(imodule)
                 nonzero_output_channels = split_network.get_nonzero_channels(out_tensor)
-                print(f'\t\t EXEC SPLIT: #{imodule}-{exec_layer_name}; Shape={list(out_tensor.shape)}; C_in={nonzero_output_channels.numpy()}')  
+                print(f'\t\t EXEC SPLIT: #{imodule}-{exec_layer_name}; Shape={list(out_tensor.shape)}; C_out={nonzero_output_channels.numpy()}')  
             return out_tensor, do_comm
             
-def final_routine(self, input_tensor):
-    '''
-        Handle final layer output (assumed linear layer)
-    '''
+    def final_output_routine(self, input_tensor):
+        '''
+            Handle final layer output (assumed linear layer)
+        '''
 
-    print('FINISHED MODEL EXECUTION')
+        print('FINISHED MODEL EXECUTION')
 
-    if self.machine == 0: # TODO: replace this with logic for root node. ATM assumes machine 0 is sent final outputs
         vertical_output = self.add_bias_to_linear()
-
-        with torch.no_grad():
-            self.model.eval()
-            full_output = self.model(input_tensor)
         
-        split_network.compare_outputs(full_output, vertical_output)
-
-        return vertical_output
+        return vertical_output, True
     
-    return -1
 
 

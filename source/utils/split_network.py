@@ -267,25 +267,31 @@ def get_output_at_each_layer(model, input_tensor):
 
     return horz_output, size_LUT
 
-def compare_outputs(full_output, horz_output):
+def compare_outputs(full_output, horz_output, indent = 0):
     ''' 
         Used for debugging output differences b/w full and split models 
     '''
+
+    if indent:
+        indent_str = '\t'*indent
+    else:   
+        indent_str =''
+
     diff_output = torch.abs(horz_output - full_output)
 
     N_batch = horz_output.shape[0]
 
-    print('Max diff:')
+    print(indent_str+'Max diff:')
     max_diff= torch.max(torch.reshape(diff_output, (N_batch, -1)), dim=1)[0]
-    print(max_diff)
+    print(indent_str, max_diff)
     #plt.hist(diff_output.reshape((-1,)))
     #plt.show()
 
     max_by_Cout = torch.max(torch.abs(diff_output.reshape((1,full_output.shape[1],-1))), dim=2)
 
     print()
-    print(max_by_Cout[0])
-    print(get_nonzero_channels(max_by_Cout[0]))
+    print(indent_str, max_by_Cout[0])
+    print(indent_str, get_nonzero_channels(max_by_Cout[0]))
 
 
     # get C_out with zero and non-zero diff
@@ -293,8 +299,8 @@ def compare_outputs(full_output, horz_output):
     failing_Cout = nonzero_Cout[torch.isin(nonzero_Cout, get_nonzero_channels(max_by_Cout[0]))]
     passing_Cout = nonzero_Cout[torch.isin(nonzero_Cout, get_nonzero_channels(max_by_Cout[0])) == False]
     print() 
-    print(f'failing Cout = {failing_Cout}  (len = {len(failing_Cout)})')
-    print(f'passing Cout = {passing_Cout}  (len = {len(passing_Cout)})')
+    print(indent_str + f'failing Cout = {failing_Cout}  (len = {len(failing_Cout)})')
+    print(indent_str + f'passing Cout = {passing_Cout}  (len = {len(passing_Cout)})')
 
     return max_diff.item(), max_by_Cout
 
