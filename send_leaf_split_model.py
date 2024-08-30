@@ -13,12 +13,12 @@ def prep_data(tensor):
         'node' : -1,
         'layer' : 0,
         'tensor' : tensor, 
-        'Cin' : list(range(tensor.shape(1)))
+        'Cin' : list(range(tensor.size(1))), 
+        'is_empty': False
     }
 
 
 def main():
-    counter = 0
     parser = argparse.ArgumentParser(description="Leaf node data collector and sender.")
     parser.add_argument("config_file", type=str, help="Path to the configuration file.")
     args = parser.parse_args()
@@ -35,9 +35,8 @@ def main():
     for iserver in range(len(servers)):
         processed_data = prep_data(tensor)
 
-        counter = 0
-        while True:
-            leaf.send_to_servers(processed_data,[servers[iserver]])     
-            counter += 1
-            if counter > 3:
-                break
+        print(f'Sending data to {servers[iserver]}')
+        leaf.send_to_servers(processed_data,[servers[iserver]])     
+
+if __name__ == "__main__":
+    main()

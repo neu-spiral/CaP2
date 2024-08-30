@@ -286,6 +286,56 @@ class SplitManager:
             print(f'\t\tSkipping check for output {output_layer_name} (no tensor found for ref.) \n')
             return 1
 
+    def enough_comms_received(self, collected_data):
+        ''' 
+            Looks at an array of dicts received in a buffer and determines if there is enough in the array for 
+            the current layer to be executed. Should be done before prep_output. TODO: generalize this for 
+            different network topologies
+
+            Input:
+                collected_data - (array of data dicts) data sent to client collected in queue
+
+            Output:
+                1 == received enough input
+                0 == received too few inputs 
+        '''
+
+        rx_from_nodes = np.array([])
+        for data in collected_data:
+            if data['layer'] == self.current_layer-1:
+                rx_from_nodes = np.append(rx_from_nodes, data['node'])
+        
+        rx_from_nodes = np.sort(rx_from_nodes)
+
+        if self.current_layer == 1:
+            # only need 1 input for layer 1
+            if  len(rx_from_nodes) == 1:
+                return 1
+            elif len(rx_from_nodes) > 1:
+                print('WARNING: got more than one input for input layer')
+                return 1
+            else:
+                # 0 inputs for input layer 
+                return 0
+        else:
+            expected_comms = np.arange(self.N_machines)
+            expected_comms = np.append(expected_comms[:self.machine],expected_comms[self.machine+1:])
+
+            if len(rx_from_nodes) < len(expected_comms):
+                print(f'Too few inputs for layer={self.current_layer}')
+                return 0
+            elif len(rx_from_nodes) > len(expected_comms):
+                print(f'WARNING: Too many inputs for layer={self.current_layer}')
+                return 1
+            elif np.all(rx_from_nodes == expected_comms):
+                return 1
+            else:
+                print(f'WARNING: received unexpected inputs for layer={self.current_layer}')
+                return 1
+
+
+
+
 
     def prep_output(self, out_tensor):
         ''' 
@@ -333,8 +383,6 @@ class SplitManager:
             output_element['node_to'] = rx_mach
 
             # Get output channels for current rx machine? TODO: consider removing, this just maps C_out's to machine
-            #output_channels = torch.tensor(configs['partition'][][rx_mach],
-            #        device=torch.device(configs['device']))
             output_channels = torch.tensor(self.output_channel_map[rx_mach],
                     device=self.device)
 
