@@ -286,6 +286,30 @@ class SplitManager:
             print(f'\t\tSkipping check for output {output_layer_name} (no tensor found for ref.) \n')
             return 1
 
+    def expected_comms_for_layer(self, layer):
+        '''
+            Determine which nodes this machine needs to wait on for the execution of layer
+
+            Input:
+                layer - (int) layer that needs to be computed 
+
+            Output:
+                tx_nodes - (np.array) array of network nodes that this machine expects comms from 
+        '''
+
+        # get last conv/split layer
+        cout_map, cin_map = SplitManager.get_last_split_maps(self.configs, self.layer_names_fx, layer)
+        output_channels_for_machine = cout_map[self.machine]
+        corresponding_input_channels = torch.unique(torch.nonzero(self.model.conv1.weight[output_channels_for_machine,], as_tuple=True)[1])
+
+        tx_nodes = np.array([])
+        for i in range(self.N_machines):
+            if torch.any(torch.isin(corresponding_input_channels, torch.tensor(cin_map[i]))):
+                tx_nodes = np.append(tx_nodes, i)
+
+        return tx_nodes
+
+
     def enough_comms_received(self, collected_data):
         ''' 
             Looks at an array of dicts received in a buffer and determines if there is enough in the array for 
@@ -318,11 +342,12 @@ class SplitManager:
                 # 0 inputs for input layer 
                 return 0
         else:
-            expected_comms = np.arange(self.N_machines)
-            expected_comms = np.append(expected_comms[:self.machine],expected_comms[self.machine+1:])
+            expected_comms = self.expected_comms_for_layer(self.current_layer)
 
             if len(rx_from_nodes) < len(expected_comms):
                 print(f'Too few inputs for layer={self.current_layer}')
+                print(f'\t\t Collected inputs from nodes: {rx_from_nodes}')
+                print(f'\t\t Need inputs from nodes: {expected_comms}')
                 return 0
             elif len(rx_from_nodes) > len(expected_comms):
                 print(f'WARNING: Too many inputs for layer={self.current_layer}')
@@ -493,6 +518,21 @@ class SplitManager:
         return self.layer_output_size_LUT[self.layer_names_fx[layer]]
 
     @staticmethod
+    def get_last_split_maps(configs, layer_names_fx, ilayer):
+            '''
+                get the entire C_out and C_in map from the last conv layer 
+
+                Output:
+                    cout_map, cin_map - (dicts of np arrays) mappings for each node and their  C_in and C_out channels for ilayer
+            '''
+            ilayer = ilayer-1 # dont start on current layer 
+            while ilayer > 0:
+                layer_name = layer_names_fx[ilayer]+'.weight'
+                if layer_name in configs['partition']:
+                    return configs['partition'][layer_name]['filter_id'], configs['partition'][layer_name]['channel_id']
+                ilayer -= 1
+    
+    @staticmethod
     def get_io_for_linear(configs, layer_names_fx, N_machines, final_node, N_Cout):
         '''
             Linear layer output is split across machines but no data structure exists to coordinate how it is communicated and to whom
@@ -512,17 +552,6 @@ class SplitManager:
                 }
 
         '''
-        
-        def get_last_split_Cout(configs, layer_names_fx, ilayer):
-            '''
-                get the entire C_out map from the last conv layer 
-            '''
-            ilayer = ilayer-1 # dont start on current layer 
-            while ilayer > 0:
-                layer_name = layer_names_fx[ilayer]+'.weight'
-                if layer_name in configs['partition']:
-                    return configs['partition'][layer_name]['filter_id']
-                ilayer -= 1
 
         cout_map = []
         for i in range(N_machines):
@@ -532,7 +561,7 @@ class SplitManager:
                 cout_map.append(np.array([]))
 
         partition_map = {
-            "channel_id" :  get_last_split_Cout(configs, layer_names_fx, len(layer_names_fx)),
+            "channel_id" :  SplitManager.get_last_split_maps(configs, layer_names_fx, len(layer_names_fx))[0],
             "filter_id" : cout_map
         }
         

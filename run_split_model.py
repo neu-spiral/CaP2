@@ -128,7 +128,7 @@ def main():
                     server_thread.join()  # Wait for the server thread to finish
                     return True # end execution
                 else:
-                    print(f'\tExecuting on machine {imach}')
+                    print(f'\tGot enough data. Starting execution')
                 
                     # collect communication inputs if necessary 
                     # 1. collect inputs for this machine and it's current layer
