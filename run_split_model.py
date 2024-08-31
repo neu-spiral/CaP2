@@ -50,6 +50,16 @@ def config_setup(num_nodes, model_file_path):
 
     return configs
 
+def get_input_tensor(collected_data):
+    '''
+        Searches for input tensor in collected_data
+    '''
+
+    for data in collected_data:
+        if isinstance(data, dict) and data['node'] == -1:
+            return data['tensor']
+    
+    return -1
 
 def main():
     ''' 
@@ -67,7 +77,7 @@ def main():
     args = parser.parse_args()
 
     # figure out who this machine/network node receives from 
-    required_clients, servers, num_nodes = node.load_config(args.ip_map_file, args.network_graph_file, args.node)
+    required_clients, servers, num_nodes, final_node = node.load_config(args.ip_map_file, args.network_graph_file, args.node)
     print(f"Required Clients: {required_clients}")
 
     # make split manager for executing split execution 
@@ -84,7 +94,7 @@ def main():
         print('Warning found no dtype field in config')
 
     imach = args.node # get network node ID number
-    model_manager = split_manager.SplitManager(configs, imach, num_nodes, input_tensor, debug=True)
+    model_manager = split_manager.SplitManager(configs, imach, num_nodes, input_tensor, final_node, debug=True)
 
     # open ip map 
     with open(args.ip_map_file, 'r') as file:
@@ -97,56 +107,37 @@ def main():
     # Start the server in a separate thread
     server_thread = threading.Thread(target=node.server, args=(server_ip, server_port, required_clients, client_data_queue))
     server_thread.start()
-    
-    # for keeping track of layer outputs being received out of order TODO: change this implementation
-    update_count = 0 
-    leftover_collected_data = []
 
-    # for final comparison
-    input_tensor = []
-
-    first_pass = True # used to handle  leaf nodes for non-DAG topology
-
-    collected_data = []
+    collected_data = [] # server fills this up 
 
     try:
         while True:
-            
-            collected_data = collected_data + node.collect_data_from_server(client_data_queue, 1, model_manager.current_layer, collected_for_layer=update_count)
-            
-            if model_manager.enough_comms_received(collected_data):
-                if len(leftover_collected_data) > 0:
-                    collected_data.append(leftover_collected_data)
 
-                # grab input tensor for debugging and final check
-                if model_manager.current_layer == 1:
-                    input_tensor = collected_data[0]['tensor']
-                    print(f'Grabbing input tensor for later')
-
-                if model_manager.is_done():
+            # shut down server if machine is finished 
+            if model_manager.is_done():
                     print(f'\tMachine {model_manager.machine} has finished calculations. Shutting down...\n')
                     server_thread.join()  # Wait for the server thread to finish
                     return True # end execution
-                else:
-                    print(f'\tGot enough data. Starting execution')
-                
-                    # collect communication inputs if necessary 
-                    # 1. collect inputs for this machine and it's current layer
-                    # 2. add them to the current_tensor 
-                    success = model_manager.process_input(collected_data) # update local tensor with inputs
-                    if success < 1:
-                        if success == 0:
-                            message_str = 'Not enough comms'
-                        elif success == -1:
-                            message_str = 'Did not add comms'
-                        elif success == -2:
-                            message_str = 'Too many comms'
-                        print(f'\t\t{message_str} for {imach} layer {model_manager.current_layer} yet. Skipping...\n')
-                        continue
-                    
-                    # execute split layers
-                    output_tensor = model_manager.execute_layers_until_comms()
+            
+            # updates local tensor if enough input is present 
+            enough_input = model_manager.process_input(collected_data) 
 
+            # check if update was made 
+            if enough_input:
+                # grab input tensor for debugging and final check
+                if model_manager.current_layer == 1:
+                    input_tensor = get_input_tensor(collected_data)
+                    if torch.is_tensor(input_tensor):
+                        model_manager.update_horz_output(input_tensor)
+                        print(f'Updating input tensor')
+                    else:
+                        print(f'Could not find input tensor')
+
+                # execute split layers
+                output_tensor = model_manager.execute_layers_until_comms()
+
+                # always send output unless on final layer
+                if not model_manager[imach].current_layer == model_manager[imach].total_layers_fx:
                     # prep output
                     processed_output = model_manager.prep_output(output_tensor) # prepare communication
                         
@@ -155,6 +146,9 @@ def main():
 
                     # remove data from the queue that was processed already 
                     collected_data = [el for el in collected_data if el['layer'] != model_manager.current_layer-2]
+            else:
+                # continue waiting
+                collected_data = collected_data + node.collect_data_from_server(client_data_queue, 1, model_manager.current_layer)
 
             # Optionally, add a sleep interval to avoid high CPU usage
             time.sleep(5)
