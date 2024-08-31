@@ -80,10 +80,10 @@ class MoP:
         test_partition(self.model, partition=self.configs['partition'])
         
         # Plot model
-        layer_id = (2,6,11,15)
-        layer_id = (2,4)
-        plot_layer(self.model, self.configs['partition'], layer_id=layer_id,
-                   savepath=get_fig_path("{}".format('.'.join(configs["load_model"].split('.')[:-1]))))
+        # layer_id = (2,6,11,15)
+        # layer_id = (2,4)
+        # plot_layer(self.model, self.configs['partition'], layer_id=layer_id,
+        #            savepath=get_fig_path("{}".format('.'.join(configs["load_model"].split('.')[:-1]))))
             
     def prune(self):
         nepoch = self.configs['epochs']

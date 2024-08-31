@@ -39,7 +39,7 @@ class SplitManager:
 
         # load model TODO: only load what is necessary for this thread
         model = get_model_from_code(configs).to(configs['device']) # grabs model architecture from ./source/models/escnet.py
-        state_dict = torch.load(io.get_model_path("{}".format(configs["load_model"])), map_location=configs['device'])
+        state_dict = torch.load(io.get_model_path_split("{}".format(configs["load_model"])), map_location=configs['device'])
         self.model = io.load_state_dict(model, 
                     state_dict['model_state_dict'] if 'model_state_dict' in state_dict 
                     else state_dict['state_dict'] if 'state_dict' in state_dict else state_dict,)
@@ -73,7 +73,9 @@ class SplitManager:
         with torch.no_grad():
 
             # skip this machine+module if there is no input to compute 
+            # print('curr input shape:', len(curr_input))
             if not torch.is_tensor(curr_input):
+                # if not torch.is_tensor(curr_input[0]):
                 if 'bn' in self.layer_names_fx[imodule]:
                     print('\t\t-No input received but bn still needs to produce output.')
                     curr_input = torch.zeros(self.size_LUT[self.layer_names_fx[imodule]], dtype=self.dtype,  device=torch.device(self.configs['device']))
@@ -112,6 +114,18 @@ class SplitManager:
                 print('\t\t-average pooling')
                 return F.avg_pool2d(curr_input, 4), False
             
+            elif 'pool' in self.layer_names_fx[imodule]:
+                print('\t\t-max pooling')
+                return F.max_pool2d(curr_input, 2), False
+            
+            elif 'pool1' in self.layer_names_fx[imodule]:
+                print('\t\t-max pooling')
+                return F.max_pool2d(curr_input, 2), False
+            
+            elif 'pool2' in self.layer_names_fx[imodule]:
+                print('\t\t-average pooling')
+                return F.avg_pool2d(curr_input, 2), False
+            
             elif 'size' in self.layer_names_fx[imodule]:
                 print('\t\t-skipping')
                 return curr_input, False
@@ -119,12 +133,38 @@ class SplitManager:
             elif 'view' in self.layer_names_fx[imodule]:
                 print('\t\t-reshaping (view)')
                 return curr_input.view(curr_input.size(0), -1), False
+            
+            elif 'getitem' in self.layer_names_fx[imodule]:
+                print('\t\t-getitem')
+                return curr_input[0], False
+            
+            elif 'getitem_1' in self.layer_names_fx[imodule]:
+                print('\t\t-getitem_1')
+                return curr_input[1], False
+            
+            elif 'getitem_2' in self.layer_names_fx[imodule]:
+                print('\t\t-getitem_2')
+                return curr_input[2], False
+            
+            elif 'getitem_3' in self.layer_names_fx[imodule]:
+                print('\t\t-getitem_3')
+                return curr_input[3], False
+            
+            elif 'getitem_4' in self.layer_names_fx[imodule]:
+                print('\t\t-getitem_4')
+                return curr_input[4], False
+            
+            elif 'cat' in self.layer_names_fx[imodule]:
+                print('\t\t-concatenating')
+                return torch.cat(curr_input, 1), False
                 
-            elif 'x' == self.layer_names_fx[imodule]:
+            elif 'x' == self.layer_names_fx[imodule] or '_x' == self.layer_names_fx[imodule]:
+            # elif 'x' == self.layer_names_fx[imodule] or '_x' == self.layer_names_fx[imodule] or 'getitem' == self.layer_names_fx[imodule] or 'getitem_1' == self.layer_names_fx[imodule] or 'getitem_2' == self.layer_names_fx[imodule] or 'getitem_3' == self.layer_names_fx[imodule] or 'getitem_4' == self.layer_names_fx[imodule] or 'cat' == self.layer_names_fx[imodule]:
                 # do nothing if model input
                 print('\t\t-model input layer.. skipping')
                 return curr_input, False
             
+            print(f'self_residual_block_start: {self.residual_block_start}')
             # swap out io for residual connection
             if imodule in self.residual_block_start:
                 # save input for later 
@@ -144,6 +184,8 @@ class SplitManager:
             # update communication I/O for this layer  
             # TODO: prep this before running execution and give this it's own method
             split_param_name = self.layer_names_fx[imodule] + '.weight'
+            print(f'split_param_name: {split_param_name}')
+            print(f'self.split_module_names: {self.split_module_names}')
             if split_param_name in self.split_module_names:
                 # skip if machine doesnt expect input
                 if len(self.configs['partition'][split_param_name]['channel_id'][self.machine]) == 0:
@@ -197,6 +239,7 @@ class SplitManager:
                 input_channels = torch.tensor(input_channels, device=torch.device(self.configs['device']))
 
             # make vertically split layer. TODO: remove this and replace curr_layer to be split_layer when first made 
+            print(f'current layer type: {type(curr_layer)}')
             if type(curr_layer) == nn.Conv2d:
                 split_layer = split_conv_layer(curr_layer, input_channels)
             elif type(curr_layer) == nn.BatchNorm2d:

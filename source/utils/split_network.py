@@ -87,10 +87,13 @@ def get_current_module(model, imodule):
     layer_names_fx =  get_graph_node_names(model)[1]
     layer_name = layer_names_fx[imodule]
 
-    if layer_name == 'x':
+    if layer_name == 'x' or layer_name == '_x':
+    # if layer_name == 'x' or layer_name == '_x' or layer_name == 'getitem' or layer_name == 'getitem_1' or layer_name == 'getitem_2' or layer_name == 'getitem_3' or layer_name == 'getitem_4' or layer_name == 'cat':
         return model 
     else:
         tmp = model
+        if '_' in layer_name:
+            layer_name = layer_name.split('_')[0]
         layer_name_split = layer_name.split('.')
         for lname in layer_name_split:
             if lname.isdigit():
@@ -118,6 +121,7 @@ def get_layer_output(model, input_tensor, imodule):
     with torch.no_grad():
         extractor_model.eval()
         intermediate_out = extractor_model(input_tensor)
+        # intermediate_out = extractor_model(*input_tensor)
         return intermediate_out[f'layer_{imodule}']
 
 def split_conv_layer(module_full, input_channels):
@@ -252,9 +256,13 @@ def get_output_at_each_layer(model, input_tensor):
         get_horz_out[aname] = aname
 
     extractor_model = create_feature_extractor(model,return_nodes = get_horz_out)
+    # print(extractor_model) # debug
     with torch.no_grad():
         extractor_model.eval()
+        print(isinstance(input_tensor, tuple))
+        print(len(input_tensor) > 1)
         horz_output = extractor_model(input_tensor)
+        # horz_output = extractor_model(*input_tensor)
     
     size_LUT = {}
     index = 0

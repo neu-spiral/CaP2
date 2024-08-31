@@ -73,6 +73,10 @@ class EvalHelper():
                     data += (piece.float().to(device),)
                 target = batch[-1].to(device)
 
+                # Concatenate the input data, it is tuple of tensors
+                data = (torch.cat(data, dim=1),)
+
+
                 # compute output
                 output = model(*data)
                 loss = criterion(output, target)

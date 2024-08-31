@@ -51,9 +51,10 @@ class ResLike(nn.Module):
         self.pool1 = nn.MaxPool2d(2)
         self.pool2 = nn.AvgPool2d(2)
     
-    def forward(self, *x):
-        if isinstance(x, tuple) and len(x)>1:
-            x = torch.cat((x[0],x[1],x[2],x[3],x[4]), dim=1)
+    # def forward(self, *x):
+    def forward(self, x):
+        # if isinstance(x, tuple) and len(x)>1:
+        # x = torch.cat((x[0],x[1],x[2],x[3],x[4]), dim=1)
         # FOR CNN BASED IMPLEMENTATION
         out = self.pool1(self.relu(self.bn(self.conv1(x))))
         out = self.layer1(out)

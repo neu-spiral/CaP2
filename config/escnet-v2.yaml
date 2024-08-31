@@ -25,6 +25,8 @@ partitions:
         - [2,3]
     hidden3.weight:
         - [2,3]
+    conv2.weight:
+        - [1,1,1,1,1]
         
 maps:
     conv1.weight:
@@ -66,3 +68,9 @@ maps:
     hidden3.weight:
         - [0,1]
         - [1,0]
+    conv2.weight:
+        - [0,1,2,2,2]
+        - [1,0,2,2,2]
+        - [2,2,0,1,1]
+        - [2,2,1,0,1]
+        - [2,2,1,1,0]

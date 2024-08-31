@@ -30,12 +30,16 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
         total_loss = 0
         comm_loss = 0
         comp_loss = 0
+
+        data = (torch.cat(data, dim=1),)
         
         optimizer.zero_grad()
         
         if configs['mix_up']:
             data, target_a, target_b, lam = mixup_data(*data, y=target, alpha=configs['alpha'])
         
+        # print(len(data))
+        # print(data[0].shape)
         output = model(*data)
         
         if configs['mix_up']:

@@ -32,12 +32,17 @@ def partition_generator(configs, model):
             ratio_partition = raw_dict['partitions']
             map_partition = raw_dict['maps']
             
-            print(ratio_partition,map_partition)
+            # print(ratio_partition,map_partition)
             for name, key in ratio_partition.items():
                 ratio_partition[name] = key[0]
                 num_partition[name] = len(key[0])
     else:
         raise Exception("num_partition must be either a filepath or an integer")
+    
+    print('num_partition:', num_partition)
+    print('ratio_partition:', ratio_partition)
+    print('map_partition:', map_partition)
+    print('bn_partition:', bn_partition)
     
     # setup bn_partition
     partition['bn_partition'] = bn_partition
@@ -46,8 +51,8 @@ def partition_generator(configs, model):
     pr, configs['prune_ratio'] = configs['prune_ratio'], {}
     for name, num in num_partition.items():
         ratio = ratio_partition[name]
-        configs['prune_ratio'][name] = 1 - sum(r**2 for r in ratio) / sum(ratio)**2
-        #configs['prune_ratio'][name] = pr
+        # configs['prune_ratio'][name] = 1 - sum(r**2 for r in ratio) / sum(ratio)**2
+        configs['prune_ratio'][name] = pr
         
     # setup partition
     ratio_prev = ratio_partition['inputs'] # for current channel ratio, which is equal to the previous filter ratio
