@@ -2,11 +2,5 @@
 /assets/data/
 /models/
 /logs/
-/source/__pycache__/
-/source/core/__pycache__/
-/source/models/__pycache__/
-/source/utils/__pycache__/
-/source/utils/calculate_flops/__pycache__/
-/source/utils/calculate_flops/ptflops/__pycache__/
-/source/utils/calculate_flops/thop/__pycache__/
+**/__pycache__/
 .vscode

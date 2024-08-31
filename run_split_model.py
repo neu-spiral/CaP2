@@ -65,7 +65,7 @@ def main():
     ''' 
         TODO: cases to handle:
         - FC network, some connections are more important than others, continue even if nodes dont send anything
-        -
+        - network nodes that do not need input will start and send right away. Consider adding a delay to ensure sure recipients arent missing communication
     
     '''
 
@@ -124,7 +124,8 @@ def main():
 
             # check if update was made 
             if enough_input:
-                # grab input tensor for debugging and final check
+                # grab input tensor for debugging and final check 
+                # TODO: this implementation needs to be changed to accomidate escnet where full input is multiple tensors, also doesnt work if final node does not receive model input 
                 if model_manager.current_layer == 1:
                     input_tensor = get_input_tensor(collected_data)
                     if torch.is_tensor(input_tensor):
@@ -137,7 +138,7 @@ def main():
                 output_tensor = model_manager.execute_layers_until_comms()
 
                 # always send output unless on final layer
-                if not model_manager[imach].current_layer == model_manager[imach].total_layers_fx:
+                if not model_manager.current_layer == model_manager.total_layers_fx:
                     # prep output
                     processed_output = model_manager.prep_output(output_tensor) # prepare communication
                         
