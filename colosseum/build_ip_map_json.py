@@ -3,11 +3,11 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser(description="Leaf node data collector and sender.")
-    parser.add_argument("ip_file", type=str, help="Path to the ip mapping config file.")
-    parser.add_argument("node_rx", type=int, help="Network node receiving connection.")
-    parser.add_argument("ip_rx", type=str, help="IP address for server on node rx.")
-    parser.add_argument("port_rx", type=int, help="Port for server on node rx.")
-    parser.add_argument("type_tx", type=str, help="Colosseum node type of transmitting node.")
+    parser.add_argument("--ip_file", type=str, help="Path to the ip mapping config file.")
+    parser.add_argument("--node_rx", type=int, help="Network node receiving connection.")
+    parser.add_argument("--ip_rx", type=str, help="IP address for server on node rx.")
+    parser.add_argument("--port_rx", type=int, help="Port for server on node rx.")
+    parser.add_argument("--type_tx", type=str, help="Colosseum node type of transmitting node.")
     args = parser.parse_args()
 
     with open(args.ip_file, "r") as f:
@@ -27,7 +27,6 @@ def main():
         else:
             # make new entry in json
             ip_json[str(args.node_rx)] = [{"ip" : args.ip_rx, "port" : args.port_rx, "connection_from" : args.type_tx}]
-            print('here')
     
         # Serializing json
         json_serialized = json.dumps(ip_json, indent=4)
