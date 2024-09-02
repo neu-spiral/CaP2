@@ -48,7 +48,7 @@ teacher=esc-escnet-kernel-npv0.pt
 
 # For yaml file selection, parameter is '-np config/${model}-$2.yaml':
 
-yaml_version=2
+yaml_version=1
 prune_ratio=0.75
 
 num_partitions=config/${model}-v${yaml_version}.yaml

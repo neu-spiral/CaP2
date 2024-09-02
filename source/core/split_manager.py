@@ -97,6 +97,7 @@ class SplitManager:
                 # residual layer. No comm necessary 
                 if self.machine in self.residual_input:
                     print('\t\t-adding residual')
+                    # print(f'self.residual_input: {self.residual_input}')
                     if 'block_out' in self.residual_input[self.machine]:
                         curr_input = curr_input + self.residual_input[self.machine]['block_out']
                     elif 'block_in' in self.residual_input[self.machine]:
@@ -114,10 +115,6 @@ class SplitManager:
                 print('\t\t-average pooling')
                 return F.avg_pool2d(curr_input, 4), False
             
-            elif 'pool' in self.layer_names_fx[imodule]:
-                print('\t\t-max pooling')
-                return F.max_pool2d(curr_input, 2), False
-            
             elif 'pool1' in self.layer_names_fx[imodule]:
                 print('\t\t-max pooling')
                 return F.max_pool2d(curr_input, 2), False
@@ -125,6 +122,10 @@ class SplitManager:
             elif 'pool2' in self.layer_names_fx[imodule]:
                 print('\t\t-average pooling')
                 return F.avg_pool2d(curr_input, 2), False
+            
+            elif 'pool' in self.layer_names_fx[imodule]:
+                print('\t\t-max pooling')
+                return F.max_pool2d(curr_input, 2), False
             
             elif 'size' in self.layer_names_fx[imodule]:
                 print('\t\t-skipping')
@@ -164,7 +165,6 @@ class SplitManager:
                 print('\t\t-model input layer.. skipping')
                 return curr_input, False
             
-            print(f'self_residual_block_start: {self.residual_block_start}')
             # swap out io for residual connection
             if imodule in self.residual_block_start:
                 # save input for later 
@@ -186,21 +186,7 @@ class SplitManager:
             split_param_name = self.layer_names_fx[imodule] + '.weight'
             print(f'split_param_name: {split_param_name}')
             print(f'self.split_module_names: {self.split_module_names}')
-            if split_param_name in self.split_module_names:
-                # skip if machine doesnt expect input
-                if len(self.configs['partition'][split_param_name]['channel_id'][self.machine]) == 0:
-                        print(f'\t\t-WARNING: No input assigned to this machine (but it was sent input?). Skipping...')
-                        return -1, False
-
-                # TODO: reconsider implementation 
-                # What input channels does this machine compute?
-                input_channels = torch.tensor(self.configs['partition'][split_param_name]['channel_id'][self.machine],
-                        device=torch.device(self.configs['device']))
-                N_in = len(input_channels) # TODO: is this used?
-
-                # Where to send output (map of output channels to different machines)
-                self.output_channel_map = self.configs['partition'][split_param_name]['filter_id']
-            elif type(curr_layer) == nn.Linear and imodule == self.total_layers_fx-1:
+            if type(curr_layer) == nn.Linear and imodule == self.total_layers_fx-1:
                 # if final layer output all goes to machine 0 
                 # TODO: find better way to handle this. Also will we encounter Linear layers not at the end of the model
                 N_Cin = curr_layer.in_features
@@ -219,6 +205,20 @@ class SplitManager:
                         else:
                             self.output_channel_map[i] = np.array([])
                 input_channels = torch.tensor(input_channels, device=torch.device(self.configs['device']))
+            elif split_param_name in self.split_module_names:
+                # skip if machine doesnt expect input
+                if len(self.configs['partition'][split_param_name]['channel_id'][self.machine]) == 0:
+                        print(f'\t\t-WARNING: No input assigned to this machine (but it was sent input?). Skipping...')
+                        return -1, False
+
+                # TODO: reconsider implementation 
+                # What input channels does this machine compute?
+                input_channels = torch.tensor(self.configs['partition'][split_param_name]['channel_id'][self.machine],
+                        device=torch.device(self.configs['device']))
+                N_in = len(input_channels) # TODO: is this used?
+
+                # Where to send output (map of output channels to different machines)
+                self.output_channel_map = self.configs['partition'][split_param_name]['filter_id']
             else:
                 # for batch normal, and functional passes through the code
                 # TODO: address the following assumptions:
@@ -241,10 +241,13 @@ class SplitManager:
             # make vertically split layer. TODO: remove this and replace curr_layer to be split_layer when first made 
             print(f'current layer type: {type(curr_layer)}')
             if type(curr_layer) == nn.Conv2d:
+                print(f'\t\t-Splitting conv layer {imodule}')
                 split_layer = split_conv_layer(curr_layer, input_channels)
             elif type(curr_layer) == nn.BatchNorm2d:
+                print(f'\t\t-Splitting batch norm layer {imodule}')
                 split_layer = split_bn_layer(curr_layer, input_channels)
             elif type(curr_layer) == nn.Linear:
+                print(f'\t\t-Splitting linear layer {imodule}')
                 split_layer = split_linear_layer(curr_layer, input_channels)
             else:
                 print(f'\t\t-Skipping module {type(curr_layer).__name__}')

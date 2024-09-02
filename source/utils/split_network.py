@@ -204,8 +204,10 @@ def get_residual_block_indexes(model):
     layer_names = get_graph_node_names(model)[1]
     
     block_num = '-1'
+    large_block_num = '-1'
     imodule = 0
     for name in layer_names:
+        print(name)
 
         # unpack layer name
         tmp = name.split('.')
@@ -213,15 +215,19 @@ def get_residual_block_indexes(model):
            # assume belongs to no large layer block e.g. start of the model 
            tmp_layer_type = tmp[0]
            tmp_block_num = '-1'
+           tmp_large_layer = '-1'
         else:
             # unpack 
             tmp_large_layer = tmp[0]
             tmp_block_num = tmp[1]
             tmp_layer_type = tmp[2]
+
+        print(f'block_num = {tmp_block_num}')
         
         # detect when a new block is entered and save the index 
-        if not (tmp_block_num == block_num):
+        if not (tmp_block_num == block_num) or not (tmp_large_layer == large_block_num):
             block_num = tmp_block_num
+            large_block_num = tmp_large_layer
             residual_block_start = np.append(residual_block_start, imodule)
 
         # detect first shortcut layer
@@ -292,8 +298,8 @@ def compare_outputs(full_output, horz_output):
     max_by_Cout = torch.max(torch.abs(diff_output.reshape((1,full_output.shape[1],-1))), dim=2)
 
     print()
-    print(max_by_Cout[0])
-    print(get_nonzero_channels(max_by_Cout[0]))
+    # print(max_by_Cout[0])
+    # print(get_nonzero_channels(max_by_Cout[0]))
 
 
     # get C_out with zero and non-zero diff
