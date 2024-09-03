@@ -105,7 +105,15 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, int(128*self.shrink), num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, int(256*self.shrink), num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, num_filters, num_blocks[3], stride=2)
-        self.linear = nn.Linear(num_filters*block.expansion, num_classes)
+
+
+
+        self.linear1 = nn.Linear(num_filters*block.expansion, 256, bias=False)
+        self.linear2 = nn.Linear(256, 128, bias=False)
+        self.linear = nn.Linear(128, num_classes)
+
+
+        # self.linear = nn.Linear(num_filters*block.expansion, num_classes)
         
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
@@ -131,9 +139,18 @@ class ResNet(nn.Module):
         #    print(i, np.sum(out_cpu[:,i]))
         # 
         # np.sum(weight_copy[i,:,:,:])
+
+
+
+
+        out = F.relu(self.linear1(out))
+        out = F.relu(self.linear2(out))
         out = self.linear(out)
-        #np.sum(weight_copy[i,:,:,:])
         return out
+
+        # out = self.linear(out)
+        # #np.sum(weight_copy[i,:,:,:])
+        # return out
 
 def resnet18(conv_layer, bn_layer, **kwargs):
     bn_partition = kwargs['bn_partition'] if 'bn_partition' in kwargs else [1]*9

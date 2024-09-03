@@ -41,11 +41,11 @@ class ResLike(nn.Module):
         self.layer4 = nn.Sequential(block(32, 32, pool_kernel=2))
         
         # self.hidden1 = nn.Linear(4160, 512)
-        self.hidden1 = nn.Linear(10240, 512, bias=False)
-        # self.hidden1 = nn.Linear(512, 512)
-        self.hidden2 = nn.Linear(512, 256, bias=False)
-        self.hidden3 = nn.Linear(256, 256, bias=False)
-        self.out = nn.Linear(256, num_classes)  # 128
+        # self.hidden1 = nn.Linear(10240, 512, bias=False)
+        # # self.hidden1 = nn.Linear(512, 512)
+        # self.hidden2 = nn.Linear(512, 256, bias=False)
+        # self.hidden3 = nn.Linear(256, 256, bias=False)
+        self.out = nn.Linear(10240, num_classes)  # 128
         #######################
         self.relu = nn.ReLU()
         self.bn = nn.BatchNorm2d(32)
@@ -66,8 +66,8 @@ class ResLike(nn.Module):
         
         x = out.view(out.size(0), -1)
         
-        x = self.relu(self.hidden1(x))
-        x = self.relu(self.hidden2(x))
+        # x = self.relu(self.hidden1(x))
+        # x = self.relu(self.hidden2(x))
         x = self.out(x)  # no softmax: CrossEntropyLoss()
         return x
     

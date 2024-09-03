@@ -180,6 +180,8 @@ def split_linear_layer(module_full, input_channels):
     
     '''
     N_in = len(input_channels)
+    # print(f'N_in = {N_in}')
+    # print(f'N_out = {module_full.weight.shape[0]}')
     split_layer = nn.Linear(N_in, 
         module_full.weight.shape[0], 
         bias=False)
@@ -207,7 +209,7 @@ def get_residual_block_indexes(model):
     large_block_num = '-1'
     imodule = 0
     for name in layer_names:
-        print(name)
+        # print(name)
 
         # unpack layer name
         tmp = name.split('.')
@@ -222,7 +224,7 @@ def get_residual_block_indexes(model):
             tmp_block_num = tmp[1]
             tmp_layer_type = tmp[2]
 
-        print(f'block_num = {tmp_block_num}')
+        # print(f'block_num = {tmp_block_num}')
         
         # detect when a new block is entered and save the index 
         if not (tmp_block_num == block_num) or not (tmp_large_layer == large_block_num):
@@ -232,6 +234,7 @@ def get_residual_block_indexes(model):
 
         # detect first shortcut layer
         if 'shortcut.0' in name:
+            # print(f'found shortcut at {imodule}')
             residual_connection_start = np.append(residual_connection_start, imodule)
 
         # detect residual summing 

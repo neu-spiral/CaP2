@@ -4,14 +4,14 @@ cuda_device=2
 
 # Dataset and model selections, should be selected in these combinations given:
 
-# dataset=cifar10
-# model=resnet18
+dataset=cifar10
+model=resnet18
 
 # dataset=cifar100
 # model=wrn28
 
-dataset=esc
-model=escnet
+# dataset=esc
+# model=escnet
 
 # dataset=flash
 # model=flashnet
@@ -19,14 +19,16 @@ model=escnet
 
 # Select teacher model with respect to the dataset and model:
 
-# teacher=cifar10-resnet18-kernel-npv0.pt
+teacher=cifar10-resnet18-kernel-npv0.pt
 # teacher=cifar100-wrn28-kernel-npv0.pt
-teacher=esc-escnet-kernel-npv0.pt
+# teacher=esc-escnet-kernel-npv0.pt
 # teacher=flash-flashnet-kernel-npv0.pt
 
 
 # Put this below as a parameter in order to avoid pre-training, and use a teacher model. If not, pre-training will be performed:
 # -lm ${teacher} \
+
+
 
 
 
@@ -36,7 +38,7 @@ teacher=esc-escnet-kernel-npv0.pt
 # # prune_ratio=0.5
 # # num_partitions=2
 
-# prune_ratio=0.85
+# prune_ratio=0.75
 # num_partitions=4
 
 # # prune_ratio=0.875
@@ -48,7 +50,7 @@ teacher=esc-escnet-kernel-npv0.pt
 
 # For yaml file selection, parameter is '-np config/${model}-$2.yaml':
 
-yaml_version=1
+yaml_version=2
 prune_ratio=0.75
 
 num_partitions=config/${model}-v${yaml_version}.yaml

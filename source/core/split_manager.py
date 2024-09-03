@@ -92,6 +92,11 @@ class SplitManager:
                 # just relu no comm necessary 
                 print('\t\t-Applying ReLU')
                 return F.relu(curr_input), False
+            
+            elif 'dropout' in self.layer_names_fx[imodule]:
+                # just dropout no comm necessary 
+                print('\t\t-Applying Dropout')
+                return F.dropout(curr_input, p=0.3, training=True), False
                 
             elif 'add' in self.layer_names_fx[imodule]:
                 # residual layer. No comm necessary 
@@ -184,8 +189,8 @@ class SplitManager:
             # update communication I/O for this layer  
             # TODO: prep this before running execution and give this it's own method
             split_param_name = self.layer_names_fx[imodule] + '.weight'
-            print(f'split_param_name: {split_param_name}')
-            print(f'self.split_module_names: {self.split_module_names}')
+            # print(f'split_param_name: {split_param_name}')
+            # print(f'self.split_module_names: {self.split_module_names}')
             if type(curr_layer) == nn.Linear and imodule == self.total_layers_fx-1:
                 # if final layer output all goes to machine 0 
                 # TODO: find better way to handle this. Also will we encounter Linear layers not at the end of the model
