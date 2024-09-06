@@ -27,7 +27,7 @@ def main():
     with open(args.config_file, "r") as f:
         config = json.load(f)
 
-    servers = [(srv['host'], srv['port']) for srv in config['servers']]
+    servers = [(srv['ip'], srv['port']) for srv in config['servers']]
 
     tensor = torch.rand((1,3,32,32)) # single image from cifar 
 
