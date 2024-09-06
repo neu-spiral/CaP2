@@ -83,7 +83,7 @@ def main():
     args = parser.parse_args()
 
     # figure out who this machine/network node receives from 
-    required_clients, servers, num_nodes, final_node = node.load_config(args.ip_map_file, args.network_graph_file, args.node)
+    required_clients, connection_type, num_nodes, final_node = node.load_config(args.ip_map_file, args.network_graph_file, args.node)
     logging.info(f"Required Clients: {required_clients}")
 
     # make split manager for executing split execution 
@@ -105,14 +105,17 @@ def main():
     # open ip map 
     with open(args.ip_map_file, 'r') as file:
         ip_map = json.load(file)
-    server_ip = ip_map[str(args.node)]['ip']
-    server_port = ip_map[str(args.node)]['port']
+    node_servers = ip_map[str(args.node)]
 
     client_data_queue = queue.Queue()  # Create a shared queue
 
-    # Start the server in a separate thread
-    server_thread = threading.Thread(target=node.server, args=(server_ip, server_port, required_clients, client_data_queue))
-    server_thread.start()
+    # Start servers on this node
+    server_threads = []
+    index = 0
+    for a_server in node_servers:
+        server_threads += [threading.Thread(target=node.server, args=(a_server['ip'], a_server['port'], required_clients, client_data_queue))]
+        server_threads[index].start()
+        index += 1
 
     collected_data = [] # server fills this up 
 
@@ -121,9 +124,11 @@ def main():
 
             # shut down server if machine is finished 
             if model_manager.is_done():
-                logging.info(f'Machine {model_manager.machine} has finished calculations. Shutting down...')
-                server_thread.join()  # Wait for the server thread to finish
-                return True # end execution
+                    logging.info(f'Machine {model_manager.machine} has finished calculations. Shutting down...')
+                    for iserver in range(len(server_threads)):
+                        server_threads[iserver].join()  # Wait for the server thread to finish
+                    return True # end execution
+
             
             # updates local tensor if enough input is present 
             enough_input = model_manager.process_input(collected_data) 
@@ -149,7 +154,7 @@ def main():
                     processed_output = model_manager.prep_output(output_tensor) # prepare communication
                         
                     # send data to correct node in network 
-                    node.send_to_nodes(processed_output, ip_map)
+                    node.send_to_nodes(processed_output, ip_map, connection_type)
 
                     # remove data from the queue that was processed already 
                     collected_data = [el for el in collected_data if el['layer'] != model_manager.current_layer-2]
@@ -161,8 +166,8 @@ def main():
             time.sleep(5)
     except KeyboardInterrupt:
         logging.info("Shutting down...")
-        server_thread.join()  # Wait for the server thread to finish
-
+        for iserver in range(len(server_threads)):
+            server_threads[iserver].join()  # Wait for the server thread to finish
 
 if __name__ == "__main__":
     main()
