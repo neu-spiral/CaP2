@@ -1,0 +1,28 @@
+{
+    "servers": [
+        {
+            "node": 3,
+            "ip": "127.0.0.1",
+            "port": 5000,
+            "connection_from": "server"
+        },
+        {
+            "node": 3,
+            "ip": "127.0.0.1",
+            "port": 5000,
+            "connection_from": "server"
+        },
+        {
+            "node": 3,
+            "ip": "127.0.0.1",
+            "port": 5000,
+            "connection_from": "server"
+        },
+        {
+            "node": 3,
+            "ip": "127.0.0.1",
+            "port": 5000,
+            "connection_from": "server"
+        }
+    ]
+}
