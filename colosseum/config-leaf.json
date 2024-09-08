@@ -4,13 +4,13 @@
             "node": 2,
             "ip": "127.0.0.1",
             "port": 5000,
-            "connection_from": "server"
+            "connection_from": "ue"
         },
         {
             "node": 3,
             "ip": "127.0.0.1",
             "port": 5000,
-            "connection_from": "server"
+            "connection_from": "ue"
         }
     ]
 }
