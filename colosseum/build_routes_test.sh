@@ -17,6 +17,7 @@
 #port_start = 5000
 
 final_node=1
+leaf_connection_type='ue'
 
 # make and or clear json obejcts
 echo {} >$2
@@ -78,6 +79,13 @@ for node_tx in "${network_node[@]}"; do
                     # pass info to python sript to build json
                     python3 -m build_ip_map_json --ip_file $2 --node_rx $node_rx --ip_rx $ip_rx --port_rx $port_rx --type_tx "${node_type["$node_tx"]}" 
                     
+                    if [ "${is_leaf[$node_rx]}" -eq 1 ]; then
+                        if [[ "${node_type["$node_rx"]}" ==  $leaf_connection_type ]]; then
+                            python3 -m build_leaf_json --leaf_file $3 --leaf_node $node_rx --ip $ip_rx --port $port_rx --connection_type $leaf_connection_type
+                            echo "Setting the leaf_host_ip IP for node $node_tx($leaf_connection_type): $ip_rx"
+                            is_leaf[$node_rx]=0 # indicate this has been taken care of
+                        fi
+                    fi
                 fi 
             done
         fi 
@@ -85,7 +93,6 @@ for node_tx in "${network_node[@]}"; do
     done 
 
     # if it's a leaf node add it to the leaf JSON
-    leaf_connection_type='server'
     if [ "${is_leaf[$node_tx]}" -eq 1 ]; then
 
         # get port/ip
