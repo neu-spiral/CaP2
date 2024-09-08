@@ -86,13 +86,13 @@ for node_tx in "${network_node[@]}"; do
 
     # if it's a leaf node add it to the leaf JSON
     leaf_connection_type='server'
-    if [ "${is_leaf[$node_rx]}" -eq 1 ]; then
+    if [ "${is_leaf[$node_tx]}" -eq 1 ]; then
 
         # get port/ip
-        ip_rx="127.0.0.1"
-        port_rx=5000
+        ip_node="127.0.0.1"
+        port_node=5000
 
-        python3 -m build_leaf_json --leaf_file $3 --leaf_node $node_rx --ip $ip_rx --port $port_rx --connection_type $leaf_connection_type
+        python3 -m build_leaf_json --leaf_file $3 --leaf_node $node_tx --ip $ip_node --port $port_node --connection_type $leaf_connection_type
 
     fi
 done
