@@ -7,8 +7,14 @@ import time
 import sys
 from os import environ
 import os, sys
+import logging
 
 import torch.types
+
+# Setup logging configuration
+logging.basicConfig(level=logging.DEBUG, 
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S')
 
 try:
     from source.core import split_manager, run_partition, engine
@@ -16,8 +22,8 @@ try:
     from source.SplitModelNetworking import node
 except:
     sys.path.append(os.path.join(os.path.dirname(__name__), "..\source"))
-    print(os.getcwd())
-    print(sys.path)
+    logging.warning(f"Current working directory: {os.getcwd()}")
+    logging.warning(f"Updated sys.path: {sys.path}")
     from source.core import split_manager, run_partition, engine
     from source.utils import misc, split_network
     from source.SplitModelNetworking import node    
@@ -78,7 +84,7 @@ def main():
 
     # figure out who this machine/network node receives from 
     required_clients, servers, num_nodes, final_node = node.load_config(args.ip_map_file, args.network_graph_file, args.node)
-    print(f"Required Clients: {required_clients}")
+    logging.info(f"Required Clients: {required_clients}")
 
     # make split manager for executing split execution 
     configs = config_setup(num_nodes, args.model_file)
@@ -89,9 +95,9 @@ def main():
         elif configs['dtype'] == 'float32':
             input_tensor = input_tensor.type(torch.float32)
         else:
-            print('Unsupported dtype')
+            logging.error('Unsupported dtype')
     else:
-        print('Warning found no dtype field in config')
+        logging.warning('No dtype field found in config')
 
     imach = args.node # get network node ID number
     model_manager = split_manager.SplitManager(configs, imach, num_nodes, input_tensor, final_node, debug=True)
@@ -115,9 +121,9 @@ def main():
 
             # shut down server if machine is finished 
             if model_manager.is_done():
-                    print(f'\tMachine {model_manager.machine} has finished calculations. Shutting down...\n')
-                    server_thread.join()  # Wait for the server thread to finish
-                    return True # end execution
+                logging.info(f'Machine {model_manager.machine} has finished calculations. Shutting down...')
+                server_thread.join()  # Wait for the server thread to finish
+                return True # end execution
             
             # updates local tensor if enough input is present 
             enough_input = model_manager.process_input(collected_data) 
@@ -125,14 +131,14 @@ def main():
             # check if update was made 
             if enough_input:
                 # grab input tensor for debugging and final check 
-                # TODO: this implementation needs to be changed to accomidate escnet where full input is multiple tensors, also doesnt work if final node does not receive model input 
+                # TODO: this implementation needs to be changed to accommodate escnet where full input is multiple tensors, also doesn't work if final node does not receive model input 
                 if model_manager.current_layer == 1:
                     input_tensor = get_input_tensor(collected_data)
                     if torch.is_tensor(input_tensor):
                         model_manager.update_horz_output(input_tensor)
-                        print(f'Updating input tensor')
+                        logging.info('Updating input tensor')
                     else:
-                        print(f'Could not find input tensor')
+                        logging.warning('Could not find input tensor')
 
                 # execute split layers
                 output_tensor = model_manager.execute_layers_until_comms()
@@ -154,7 +160,7 @@ def main():
             # Optionally, add a sleep interval to avoid high CPU usage
             time.sleep(5)
     except KeyboardInterrupt:
-        print("Shutting down...")
+        logging.info("Shutting down...")
         server_thread.join()  # Wait for the server thread to finish
 
 
