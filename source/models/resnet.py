@@ -30,6 +30,7 @@ class BasicBlock(nn.Module):
         #self.bn1 = nn.BatchNorm2d(planes)
         
         self.shortcut = nn.Sequential()
+        self.relu = nn.ReLU()
         if stride != 1 or in_planes != self.expansion*planes:
             if bn_partition == 1:
                 self.shortcut = nn.Sequential(
@@ -43,11 +44,11 @@ class BasicBlock(nn.Module):
                 )
                 
     def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
         
         out += self.shortcut(x)
-        out = F.relu(out)
+        out = self.relu(out)
         
         #out_cpu = out.cpu().detach().numpy()
         #print(out_cpu.shape)
@@ -106,14 +107,15 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, int(256*self.shrink), num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, num_filters, num_blocks[3], stride=2)
 
+        self.relu = nn.ReLU()
+        self.avg_pool = nn.AvgPool2d(4)
+
+        # self.linear1 = nn.Linear(num_filters*block.expansion, 256, bias=False)
+        # self.linear2 = nn.Linear(256, 128, bias=False)
+        # self.out = nn.Linear(128, num_classes)
 
 
-        self.linear1 = nn.Linear(num_filters*block.expansion, 256, bias=False)
-        self.linear2 = nn.Linear(256, 128, bias=False)
-        self.linear = nn.Linear(128, num_classes)
-
-
-        # self.linear = nn.Linear(num_filters*block.expansion, num_classes)
+        self.out= nn.Linear(num_filters*block.expansion, num_classes)
         
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
@@ -125,12 +127,12 @@ class ResNet(nn.Module):
 
     def forward(self, x):
             
-        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.relu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
         out = self.layer2(out)
         out = self.layer3(out)
         out = self.layer4(out)
-        out = F.avg_pool2d(out, 4)
+        out = self.avg_pool(out)
         out = out.view(out.size(0), -1)
         
         #out_cpu = out.cpu().detach().numpy()
@@ -143,14 +145,14 @@ class ResNet(nn.Module):
 
 
 
-        out = F.relu(self.linear1(out))
-        out = F.relu(self.linear2(out))
-        out = self.linear(out)
-        return out
-
-        # out = self.linear(out)
-        # #np.sum(weight_copy[i,:,:,:])
+        # out = self.relu(self.linear1(out))
+        # out = self.relu(self.linear2(out))
+        # out = self.out(out)
         # return out
+
+        out = self.out(out)
+        #np.sum(weight_copy[i,:,:,:])
+        return out
 
 def resnet18(conv_layer, bn_layer, **kwargs):
     bn_partition = kwargs['bn_partition'] if 'bn_partition' in kwargs else [1]*9

@@ -4,14 +4,14 @@ cuda_device=2
 
 # Dataset and model selections, should be selected in these combinations given:
 
-dataset=cifar10
-model=resnet18
+# dataset=cifar10
+# model=resnet18
 
 # dataset=cifar100
 # model=wrn28
 
-# dataset=esc
-# model=escnet
+dataset=esc
+model=escnet
 
 # dataset=flash
 # model=flashnet
@@ -19,9 +19,9 @@ model=resnet18
 
 # Select teacher model with respect to the dataset and model:
 
-teacher=cifar10-resnet18-kernel-npv0.pt
+# teacher=cifar10-resnet18-kernel-npv0.pt
 # teacher=cifar100-wrn28-kernel-npv0.pt
-# teacher=esc-escnet-kernel-npv0.pt
+teacher=esc-escnet-kernel-npv0.pt
 # teacher=flash-flashnet-kernel-npv0.pt
 
 
@@ -32,28 +32,28 @@ teacher=cifar10-resnet18-kernel-npv0.pt
 
 
 
-# # Prune ratios and num_partitions, should be selected in these combinations given:
-# yaml_version=0 # meaning no yaml file is used, num_partitions=2,4,8 is used
+# Prune ratios and num_partitions, should be selected in these combinations given:
+yaml_version=0 # meaning no yaml file is used, num_partitions=2,4,8 is used
 
-# # prune_ratio=0.5
-# # num_partitions=2
+# prune_ratio=0.5
+# num_partitions=2
 
-# prune_ratio=0.75
-# num_partitions=4
-
-# # prune_ratio=0.875
-# # num_partitions=8
-
-
-
-
-
-# For yaml file selection, parameter is '-np config/${model}-$2.yaml':
-
-yaml_version=2
 prune_ratio=0.75
+num_partitions=4
 
-num_partitions=config/${model}-v${yaml_version}.yaml
+# prune_ratio=0.875
+# num_partitions=8
+
+
+
+
+
+# # For yaml file selection, parameter is '-np config/${model}-$2.yaml':
+
+# yaml_version=1
+# prune_ratio=0.75
+
+# num_partitions=config/${model}-v${yaml_version}.yaml
 
 
 

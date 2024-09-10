@@ -13,16 +13,15 @@ def partition_generator(configs, model):
         # Todo: automatically set bn_partition
         ratio_partition, map_partition = {}, {}
         bn_partition = [int(configs['num_partition'])] * 9
+        num = int(configs['num_partition'])
+        maps = np.ones((num,num))
         for name, W in itertools.chain(model.named_parameters() , list({'inputs':None}.items())):
-            if name=='inputs' or (len(W.size()) == 4): 
-                # TODO: num and maps do not change from loop to loop
-                num = int(configs['num_partition'])
-                maps = np.ones((num,num))
-                
-                num_partition[name] = num
-                ratio_partition[name] = [1]*num
-                np.fill_diagonal(maps, 0)
-                map_partition[name] = maps
+            if name=='inputs' or (len(W.size()) == 4) or (len(W.size()) == 2):
+                if not 'out' in name:                  
+                    num_partition[name] = num
+                    ratio_partition[name] = [1]*num
+                    np.fill_diagonal(maps, 0)
+                    map_partition[name] = maps.astype(int).tolist()
                 
     elif os.path.exists(configs['num_partition']):
         with open(configs['num_partition'], "r") as stream:

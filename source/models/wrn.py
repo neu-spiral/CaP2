@@ -27,6 +27,7 @@ class BasicBlock(nn.Module):
         self.conv2 = conv_layer(out_planes, out_planes, kernel_size=3, stride=1,
                                padding=1, bias=False)
         self.droprate = dropRate
+        # self.dropout = nn.Dropout(p=self.droprate, training=self.training)
         self.equalInOut = (in_planes == out_planes)
         self.convShortcut = (not self.equalInOut) and nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride,
                                padding=0, bias=False) or None
@@ -83,7 +84,8 @@ class WideResNet(nn.Module):
         num_bn = bn_partition.pop(0)
         self.bn1 = bn_layer(nChannels[3]) if num_bn==1 else bn_layer(nChannels[3], num_bn)
         self.relu = nn.ReLU(inplace=True)
-        self.linear = nn.Linear(nChannels[3], num_classes)
+        self.avg_pool = nn.AvgPool2d(8)
+        self.out = nn.Linear(nChannels[3], num_classes)
         self.nChannels = nChannels[3]
 
         for m in self.modules():
@@ -108,9 +110,9 @@ class WideResNet(nn.Module):
         out = self.layer2(out)
         out = self.layer3(out)
         out = self.relu(self.bn1(out))
-        out = F.avg_pool2d(out, 8)
+        out = self.avg_pool(out)
         out = out.view(-1, self.nChannels)
-        return self.linear(out)
+        return self.out(out)
 
 def wrn16_8(conv_layer, bn_layer, **kwargs):
     bn_partition = kwargs['bn_partition'] if 'bn_partition' in kwargs else [1]*9

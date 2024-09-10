@@ -7,6 +7,9 @@ import torch
 import torch.nn.functional as F
 from torchvision.models.feature_extraction import create_feature_extractor, get_graph_node_names
 
+import functools
+import operator
+
 class SplitManager:
     """
     Each thread runs a SplitManager object to handle I/O for it's portion of the vertically split model 
@@ -116,21 +119,50 @@ class SplitManager:
 
                 return curr_input, False
             
-            elif 'avg_pool2d' in self.layer_names_fx[imodule]:
+            # elif 'avg_pool1' in self.layer_names_fx[imodule]:
+            #     print('\t\t-average pooling')
+            #     kern = self.model.avg_pool1.kernel_size
+            #     return F.avg_pool2d(curr_input, kern), False
+            
+            # elif 'avg_pool2' in self.layer_names_fx[imodule]:
+            #     print('\t\t-average pooling')
+            #     kern = self.model.avg_pool2.kernel_size
+            #     return F.avg_pool2d(curr_input, kern), False
+            
+            elif 'avg_pool' in self.layer_names_fx[imodule]:
                 print('\t\t-average pooling')
-                return F.avg_pool2d(curr_input, 4), False
+                layer_path = self.layer_names_fx[imodule]
+                modules = layer_path.split('.')
+                layer_name = functools.reduce(getattr, modules, self.model)
+                kern = layer_name.kernel_size
+                return F.avg_pool2d(curr_input, kern), False
             
-            elif 'pool1' in self.layer_names_fx[imodule]:
+            # elif 'max_pool1' in self.layer_names_fx[imodule]:
+            #     print(self.layer_names_fx[imodule])
+            #     print('\t\t-max pooling')
+            #     kern = self.model.self.layer_names_fx[imodule].kernel_size
+            #     return F.max_pool2d(curr_input, kern), False
+            
+            # elif 'max_pool2' in self.layer_names_fx[imodule]:
+            #     print('\t\t-max pooling')
+            #     kern = self.model.max_pool2.kernel_size
+            #     return F.max_pool2d(curr_input, kern), False
+            
+            elif 'max_pool' in self.layer_names_fx[imodule]:
                 print('\t\t-max pooling')
-                return F.max_pool2d(curr_input, 2), False
+                layer_path = self.layer_names_fx[imodule]
+                modules = layer_path.split('.')
+                layer_name = functools.reduce(getattr, modules, self.model)
+                kern = layer_name.kernel_size
+                return F.max_pool2d(curr_input, kern), False
             
-            elif 'pool2' in self.layer_names_fx[imodule]:
-                print('\t\t-average pooling')
-                return F.avg_pool2d(curr_input, 2), False
+            # elif 'pool2' in self.layer_names_fx[imodule]:
+            #     print('\t\t-average pooling')
+            #     return F.avg_pool2d(curr_input, 2), False
             
-            elif 'pool' in self.layer_names_fx[imodule]:
-                print('\t\t-max pooling')
-                return F.max_pool2d(curr_input, 2), False
+            # elif 'pool' in self.layer_names_fx[imodule]:
+            #     print('\t\t-max pooling')
+            #     return F.max_pool2d(curr_input, 2), False
             
             elif 'size' in self.layer_names_fx[imodule]:
                 print('\t\t-skipping')
@@ -140,31 +172,31 @@ class SplitManager:
                 print('\t\t-reshaping (view)')
                 return curr_input.view(curr_input.size(0), -1), False
             
-            elif 'getitem' in self.layer_names_fx[imodule]:
-                print('\t\t-getitem')
-                return curr_input[0], False
+            # elif 'getitem' in self.layer_names_fx[imodule]:
+            #     print('\t\t-getitem')
+            #     return curr_input[0], False
             
-            elif 'getitem_1' in self.layer_names_fx[imodule]:
-                print('\t\t-getitem_1')
-                return curr_input[1], False
+            # elif 'getitem_1' in self.layer_names_fx[imodule]:
+            #     print('\t\t-getitem_1')
+            #     return curr_input[1], False
             
-            elif 'getitem_2' in self.layer_names_fx[imodule]:
-                print('\t\t-getitem_2')
-                return curr_input[2], False
+            # elif 'getitem_2' in self.layer_names_fx[imodule]:
+            #     print('\t\t-getitem_2')
+            #     return curr_input[2], False
             
-            elif 'getitem_3' in self.layer_names_fx[imodule]:
-                print('\t\t-getitem_3')
-                return curr_input[3], False
+            # elif 'getitem_3' in self.layer_names_fx[imodule]:
+            #     print('\t\t-getitem_3')
+            #     return curr_input[3], False
             
-            elif 'getitem_4' in self.layer_names_fx[imodule]:
-                print('\t\t-getitem_4')
-                return curr_input[4], False
+            # elif 'getitem_4' in self.layer_names_fx[imodule]:
+            #     print('\t\t-getitem_4')
+            #     return curr_input[4], False
             
-            elif 'cat' in self.layer_names_fx[imodule]:
-                print('\t\t-concatenating')
-                return torch.cat(curr_input, 1), False
+            # elif 'cat' in self.layer_names_fx[imodule]:
+            #     print('\t\t-concatenating')
+            #     return torch.cat(curr_input, 1), False
                 
-            elif 'x' == self.layer_names_fx[imodule] or '_x' == self.layer_names_fx[imodule]:
+            elif 'x' == self.layer_names_fx[imodule]:
             # elif 'x' == self.layer_names_fx[imodule] or '_x' == self.layer_names_fx[imodule] or 'getitem' == self.layer_names_fx[imodule] or 'getitem_1' == self.layer_names_fx[imodule] or 'getitem_2' == self.layer_names_fx[imodule] or 'getitem_3' == self.layer_names_fx[imodule] or 'getitem_4' == self.layer_names_fx[imodule] or 'cat' == self.layer_names_fx[imodule]:
                 # do nothing if model input
                 print('\t\t-model input layer.. skipping')
@@ -244,7 +276,7 @@ class SplitManager:
                 input_channels = torch.tensor(input_channels, device=torch.device(self.configs['device']))
 
             # make vertically split layer. TODO: remove this and replace curr_layer to be split_layer when first made 
-            print(f'current layer type: {type(curr_layer)}')
+            # print(f'current layer type: {type(curr_layer)}')
             if type(curr_layer) == nn.Conv2d:
                 print(f'\t\t-Splitting conv layer {imodule}')
                 split_layer = split_conv_layer(curr_layer, input_channels)
