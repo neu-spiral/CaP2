@@ -53,18 +53,19 @@ a_port=$starting_port
 for node_tx in "${network_node[@]}"; do 
 
     tx_node_type="${node_type["$node_tx"]}"
-    tx_node_srn="${srn_number["$node_tx"]}"
+    tx_node_srn="genesys-${srn_number["$node_tx"]}"
 
     # parse string of edges
     tmp=${edges[$node_tx]}
     IFS=',' read -ra tmp_edge_array <<< "$tmp"
 
+    echo "Adding to network graph $tx_node_srn as network node=$node_tx"
     python3 -m build_network_graph --network_file $4 --edges $tmp --tx_node $node_tx --tx_node_type $tx_node_type --final_node $final_node
 
     for node_rx in "${network_node[@]}"; do
 
         rx_node_type="${node_type["$node_rx"]}"
-        rx_node_srn="${srn_number["$node_rx"]}"
+        rx_node_srn="genesys-${srn_number["$node_rx"]}"
 
         # skip if tx and rx are the same node
         if [ "$node_rx" != "$node_tx" ]; then
@@ -77,6 +78,8 @@ for node_tx in "${network_node[@]}"; do
                 if [[ "$e" == "$node_rx" ]]; then
 
                     ### BEGIN INTEGRATION
+
+                    echo "Finding ip address for node $node_tx to node $node_rx ($rx_node_type) connection"
                     
                     # Get correct IP for next node based on its type
                     if [[ "$rx_node_type" == "server" ]]; then
@@ -84,10 +87,10 @@ for node_tx in "${network_node[@]}"; do
                         echo "Setting rx_host_ip IP for node $rx_node_srn(server): $rx_host_ip"
 
                         # check to see if this is a UE
-                        if sshpass -p "scope" ssh "$prefixed_number" 'ifconfig tun_srsue'; then
-                        tun_srsue_ip=$(sshpass -p "scope" ssh "$prefixed_number" 'ifconfig tun_srsue' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
-                        echo "Adding route to UE with: ip route add $rx_host_ip via $tun_srsue"
-                        sshpass -p "scope" ssh "$prefixed_number" "ip route add $rx_host_ip via $tun_srsue"
+                        if sshpass -p "scope" ssh "$tx_node_srn" 'ifconfig tun_srsue'; then
+                        tun_srsue_ip=$(sshpass -p "scope" ssh "$tx_node_srn" 'ifconfig tun_srsue' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
+                        echo "Adding route to UE with: ip route add $rx_host_ip via $tun_srsue_ip"
+                        sshpass -p "scope" ssh "$tx_node_srn" "ip route add $rx_host_ip via $tun_srsue_ip"
                         fi
 
                     elif [[ "$rx_node_type" == "wifi" && "$rx_node_type" != "wifi" ]]; then
@@ -103,13 +106,13 @@ for node_tx in "${network_node[@]}"; do
                         if sshpass -p "scope" ssh "$rx_node_srn" 'ifconfig tun_srsue'; then
                         echo "rx_host_ip is a UE"
                         rx_host_ip=$(sshpass -p "scope" ssh "$rx_node_srn" 'ifconfig tun_srsue' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
-                        if [[ "$rx_node_type" == "server" ]]; then
-                            echo "Adding route to cell network via colab network with: ip route add $rx_host_ip via $prev_host"
-                            sshpass -p "ChangeMe" ssh "$prefixed_number" "ip route add $rx_host_ip via $prev_host"
-                        elif [[ "$rx_node_type" == "wifi" ]]; then
-                            wifi_col0=$(sshpass -p "sunflower" ssh "$prefixed_number" 'ifconfig col0' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
+                        if [[ "$tx_node_type" == "server" ]]; then
+                            echo "Adding route to cell network via colab network with: ip route add $rx_host_ip via $tx_host_ip"
+                            sshpass -p "ChangeMe" ssh "$tx_node_srn" "ip route add $rx_host_ip via $tx_host_ip"
+                        elif [[ "$tx_node_type" == "wifi" ]]; then
+                            wifi_col0=$(sshpass -p "sunflower" ssh "$tx_node_srn" 'ifconfig col0' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
                             echo "Adding route to cell network via colab network with: ip route add $rx_host_ip via $wifi_col0"
-                            sshpass -p "sunflower" ssh "$prefixed_number" "ip route add $rx_host_ip via $wifi_col0"
+                            sshpass -p "sunflower" ssh "$tx_node_srn" "ip route add $rx_host_ip via $wifi_col0"
                         else
                             echo "unknown node type"
                         fi
@@ -152,6 +155,7 @@ for node_tx in "${network_node[@]}"; do
                     ### END INTEGRATION
 
                     # pass info to python sript to build json
+                    echo "Adding '${node_type["$node_tx"]}' server for node '$node_rx' : ip = '$rx_host_ip'"
                     python3 -m build_ip_map_json --ip_file $2 --node_rx $node_rx --ip_rx $rx_host_ip --port_rx $a_port --type_tx "${node_type["$node_tx"]}" 
                     
                     # use same info for leaf node if necessary
@@ -181,10 +185,10 @@ for node_tx in "${network_node[@]}"; do
             echo "Setting leaf_host_ip IP for node $tx_node_srn(server): $leaf_host_ip"
 
             # check to see if this is a UE
-            if sshpass -p "scope" ssh "$prefixed_number" 'ifconfig tun_srsue'; then
-            tun_srsue_ip=$(sshpass -p "scope" ssh "$prefixed_number" 'ifconfig tun_srsue' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
+            if sshpass -p "scope" ssh "$tx_node_srn" 'ifconfig tun_srsue'; then
+            tun_srsue_ip=$(sshpass -p "scope" ssh "$tx_node_srn" 'ifconfig tun_srsue' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
             echo "Adding route to UE with: ip route add $leaf_host_ip via $tun_srsue"
-            sshpass -p "scope" ssh "$prefixed_number" "ip route add $leaf_host_ip via $tun_srsue"
+            sshpass -p "scope" ssh "$tx_node_srn" "ip route add $leaf_host_ip via $tun_srsue"
             fi
 
         elif [[ "$tx_node_type" == "wifi" && "$tx_node_type" != "wifi" ]]; then
@@ -202,11 +206,11 @@ for node_tx in "${network_node[@]}"; do
             leaf_host_ip=$(sshpass -p "scope" ssh "$tx_node_srn" 'ifconfig tun_srsue' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
             if [[ "$tx_node_type" == "server" ]]; then
                 echo "Adding route to cell network via colab network with: ip route add $leaf_host_ip via $prev_host"
-                sshpass -p "ChangeMe" ssh "$prefixed_number" "ip route add $leaf_host_ip via $prev_host"
+                sshpass -p "ChangeMe" ssh "$tx_node_srn" "ip route add $leaf_host_ip via $prev_host"
             elif [[ "$tx_node_type" == "wifi" ]]; then
-                wifi_col0=$(sshpass -p "sunflower" ssh "$prefixed_number" 'ifconfig col0' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
+                wifi_col0=$(sshpass -p "sunflower" ssh "$tx_node_srn" 'ifconfig col0' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')
                 echo "Adding route to cell network via colab network with: ip route add $leaf_host_ip via $wifi_col0"
-                sshpass -p "sunflower" ssh "$prefixed_number" "ip route add $leaf_host_ip via $wifi_col0"
+                sshpass -p "sunflower" ssh "$tx_node_srn" "ip route add $leaf_host_ip via $wifi_col0"
             else
                 echo "unknown node type"
             fi

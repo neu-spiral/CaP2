@@ -47,13 +47,13 @@ for ((i=1; i<=num_lines; i++)); do
 
       # Sync local repo with the remote
       echo "Syncing local repo with $prefixed_number"
-      sshpass -p "scope" rsync -avz --exclude='.git' ../../CaP/ $prefixed_number:/root/CaP/
+      sshpass -p "scope" rsync -avz --exclude='.git' --exclude='assets/' ../../CaP/ $prefixed_number:/root/CaP/
       sleep 1
 
       # Copy model to network node      
       echo "Copying $2.pt to $prefixed_number"
       sshpass -p "scope" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/$2.pt /tmp/'"
-      sshpass -p "scope" ssh "$prefixed_number" "cp /tmp/$2.pt /root/CaP/assets/models/" &
+      sshpass -p "scope" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models && cp /tmp/$2.pt /root/CaP/assets/models/" &
       sleep 2
       
       ;;
@@ -75,14 +75,16 @@ for ((i=1; i<=num_lines; i++)); do
 
       # Sync local repo with the remote
       echo "Syncing local repo with $prefixed_number"
-      sshpass -p "sunflower" rsync -avz --exclude='.git'  ../../CaP/ $prefixed_number:/root/CaP/
+      sshpass -p "sunflower" rsync -avz --exclude='.git' --exclude='assets/'  ../../CaP/ $prefixed_number:/root/CaP/
       sleep 1
 
       # Copy model to network node      
       echo "Copying $2.pt to $prefixed_number"
       sshpass -p "sunflower" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/$2.pt /tmp/'"
-      sshpass -p "sunflower" ssh "$prefixed_number" "cp /tmp/$2.pt /root/CaP/assets/models/" &
+      sshpass -p "sunflower" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models && cp /tmp/$2.pt /root/CaP/assets/models/" &
       sleep 2
+
+      ;;
 
     server)
       # Configuration for server type
@@ -90,15 +92,17 @@ for ((i=1; i<=num_lines; i++)); do
 
       # Sync local networks-for-ai directory with the remote
       echo "Syncing local repo with $prefixed_number"
-      sshpass -p "ChangeMe" rsync -avz --exclude='.git' ../../CaP/ $prefixed_number:/root/CaP/
+      sshpass -p "ChangeMe" rsync -avz --exclude='.git' --exclude='assets/' ../../CaP/ $prefixed_number:/root/CaP/
       sleep 1
 
       # Copy model to network node      
       echo "Copying $2.pt to $prefixed_number"
       sshpass -p "ChangeMe" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/$2.pt /tmp/'"
-      sshpass -p "ChangeMe" ssh "$prefixed_number" "cp /tmp/$2.pt /root/CaP/assets/models/" &
+      sshpass -p "ChangeMe" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models && cp /tmp/$2.pt /root/CaP/assets/models/" &
       sleep 2
-
+      
+      ;;
+    
     *)
       # Handle unknown types here
       echo "Unknown type: $node_type"
