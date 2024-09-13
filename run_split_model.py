@@ -12,7 +12,7 @@ import logging
 import torch.types
 
 # Setup logging configuration
-logging.basicConfig(level=logging.DEBUG, 
+logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(levelname)s - %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -80,6 +80,8 @@ def main():
     parser.add_argument('network_graph_file', type=str, help='Path to network graph JSON file')
     parser.add_argument('node', type=int, help='Node in the network to launch server for')
     parser.add_argument('model_file', type=str, help='File path to model')
+    parser.add_argument('--debug', action=argparse.BooleanOptionalAction)
+    parser.add_argument('debug', choices=['True', 'False'], default='True', help='Check each output tensor of split model')
     args = parser.parse_args()
 
     # figure out who this machine/network node receives from 
@@ -100,7 +102,7 @@ def main():
         logging.warning('No dtype field found in config')
 
     imach = args.node # get network node ID number
-    model_manager = split_manager.SplitManager(configs, imach, num_nodes, input_tensor, final_node, debug=True)
+    model_manager = split_manager.SplitManager(configs, imach, num_nodes, input_tensor, final_node, args.debug == 'True')
 
     # open ip map 
     with open(args.ip_map_file, 'r') as file:

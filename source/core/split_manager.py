@@ -756,7 +756,8 @@ class SplitManager:
             
             exec_layer_name = self.get_layer_name(imodule)
             nonzero_output_channels = split_network.get_nonzero_channels(out_tensor)
-            logging.debug(f'EXEC SPLIT: #{imodule}-{exec_layer_name}; Shape={list(out_tensor.shape)}; C_out={nonzero_output_channels.numpy()}')  
+            logging.debug(f'EXECUTED: #{imodule}-{exec_layer_name}')  
+            logging.debug(f'SPLIT OUTPUT: Shape={list(out_tensor.shape)}; C_out={nonzero_output_channels.numpy()}')  
             return out_tensor, do_comm
             
     def final_output_routine(self, input_tensor):
