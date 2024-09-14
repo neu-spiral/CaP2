@@ -3,7 +3,7 @@
 #   Should be done before ./setup.sh and ./build_routes.sh
 #
 #   Example:
-#   ./start_servers_colosseum.sh "./nodes_test.txt" "./ip-map.json" "./network-graph.json" "cifar10-resnet18-kernel-npv0-pr0.75-lcm0.001.pt"
+#   ./start_servers_colosseum.sh "./nodes.txt" "./ip-map.json" "./network-graph.json" "cifar10-resnet18-kernel-npv0-pr0.75-lcm0.001.pt"
 #
 # Path to the JSON file
 nodes_file=$1

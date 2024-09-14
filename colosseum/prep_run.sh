@@ -127,11 +127,11 @@ done
 wait
 
 ## HOW TO RUN: 
-#   bash ./build_routes_test.sh nodes_test.txt ip-map.json config-leaf.json network-graph.json
+#   bash ./build_routes_test.sh nodes.txt ip-map.json config-leaf.json network-graph.json
 #   
 #   INPUTS:
-#       nodes_test.txt -- maps together: colosseum node srn, network node #, network node edges, is leaf node
-#                         Expects nodes_test.txt to have a line for each network node in the network. 
+#       nodes.txt -- maps together: colosseum node srn, network node #, network node edges, is leaf node
+#                         Expects nodes.txt to have a line for each network node in the network. 
 #                               [node type]-[srn number]-[network node number]-[edges/nodes that this node sends to]-[bool is leaf node?]
 #       ip-map.json -- filepath of ip/routing table, this will be overwritten if exists
 #       config-leaf.json -- filepath list of ip/ports to send model inputs to, this will be overwritten if exists
