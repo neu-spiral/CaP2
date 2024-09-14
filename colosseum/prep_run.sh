@@ -1,4 +1,131 @@
 #!/bin/bash
+## HOW TO RUN: ./setup.sh node_list.txt [model name e.g. cifar10-resnet18-kernel-npv0-pr0.75-lcm0.001]
+## node_list.txt should be formatted like:
+## type-srnnumber-network node
+## type-srnnumber-network node (etc)
+## TODO: include support for nodes using only part of the entire model 
+## Expects model name in argument to be on the file-proxy server here: /share/nas/genesys/CaP-Models
+## if you are using cell, the base station is always the first node
+
+# Initialize a flag to track if cell or wifi nodes are encountered
+rf_flag=false
+
+# TODO: remove hardcoded params for 2nd half
+final_node=1
+starting_port=49200 # Starting port definition TODO: increment this? Right not this does not change
+leaf_connection_type='server'
+ip_map_file='ip-map.json'
+leaf_file='config-leaf.json'
+graph_file='network-graph.json'
+
+
+# Get the number of lines in the file
+num_lines=$(wc -l < "$1")
+
+# Loop through each line number
+for ((i=1; i<=num_lines; i++)); do
+  # Read the line using sed
+  line=$(sed -n "${i}p" "$1")
+
+  # Split the line into three variables
+  node_type=$(echo "$line" | cut -d'-' -f1)
+  number=$(echo "$line" | cut -d'-' -f2)
+  node=$(echo "$line" | cut -d'-' -f3)
+
+  # Add the prefix 'genesys-' to the number portion
+  prefixed_number="genesys-$number"
+
+  echo "Configuring $prefixed_number as a $node_type node"
+  sleep 1
+  # Perform different configurations based on the node_type
+  case "$node_type" in
+    cell)
+      # Configuration for cell type
+      echo "Running configuration for cell type..."
+      if [ "$rf_flag" = false ]; then
+        echo "Starting rf scenario"
+        sshpass -p "scope" ssh "$prefixed_number" 'colosseumcli rf start 1017 -c'
+        rf_flag=true
+        sleep 5
+      fi
+      sshpass -p "scope" scp ./jarvis.conf $prefixed_number:/root/radio_api/
+      sleep 2
+      sshpass -p "scope" ssh "$prefixed_number" "cd /root/radio_api && python3 scope_start.py --config-file jarvis.conf" &
+      echo "Letting scope start"
+      sleep 20  # Let the node start before moving on
+
+      # Sync local repo with the remote
+      echo "Syncing local repo with $prefixed_number"
+      sshpass -p "scope" rsync -avz --exclude='.git' --exclude='assets/' ../../CaP/ $prefixed_number:/root/CaP/
+      sleep 1
+
+      # Copy model to network node      
+      echo "Copying $2.pt to $prefixed_number"
+      sshpass -p "scope" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/$2.pt /tmp/'"
+      sshpass -p "scope" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models && cp /tmp/$2.pt /root/CaP/assets/models/" &
+      sleep 2
+      
+      ;;
+
+    wifi)
+      # Configuration for wifi type
+      echo "Running configuration for wifi type..."
+      if [ "$rf_flag" = false ]; then
+        echo "Starting rf scenario"
+        sshpass -p "sunflower" ssh "$prefixed_number" 'colosseumcli rf start 1017 -c'
+        rf_flag=true
+        sleep 10
+      fi
+      sshpass -p "sunflower" ssh "$prefixed_number" "cd interactive_scripts && ./tap_setup.sh"
+      sleep 5
+      gnome-terminal -- bash -c "sshpass -p 'sunflower' ssh '$prefixed_number' 'cd interactive_scripts && ./modem_start.sh'; bash"
+      #mintty -- bash -c "sshpass -p 'sunflower' ssh '$prefixed_number' 'cd interactive_scripts && ./modem_start.sh'; bash"
+      sleep 1
+
+      # Sync local repo with the remote
+      echo "Syncing local repo with $prefixed_number"
+      sshpass -p "sunflower" rsync -avz --exclude='.git' --exclude='assets/'  ../../CaP/ $prefixed_number:/root/CaP/
+      sleep 1
+
+      # Copy model to network node      
+      echo "Copying $2.pt to $prefixed_number"
+      sshpass -p "sunflower" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/$2.pt /tmp/'"
+      sshpass -p "sunflower" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models && cp /tmp/$2.pt /root/CaP/assets/models/" &
+      sleep 2
+
+      ;;
+
+    server)
+      # Configuration for server type
+      echo "Running configuration for server type..."
+
+      # Sync local networks-for-ai directory with the remote
+      echo "Syncing local repo with $prefixed_number"
+      sshpass -p "ChangeMe" rsync -avz --exclude='.git' --exclude='assets/' ../../CaP/ $prefixed_number:/root/CaP/
+      sleep 1
+
+      # Copy model to network node      
+      echo "Copying $2.pt to $prefixed_number"
+      sshpass -p "ChangeMe" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/$2.pt /tmp/'"
+      sshpass -p "ChangeMe" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models && cp /tmp/$2.pt /root/CaP/assets/models/" &
+      sleep 2
+      
+      ;;
+    
+    *)
+      # Handle unknown types here
+      echo "Unknown type: $node_type"
+      ;;
+  esac
+
+  echo ""
+  echo ""
+
+done
+
+# Wait for background processes to complete
+wait
+
 ## HOW TO RUN: 
 #   bash ./build_routes_test.sh nodes_test.txt ip-map.json config-leaf.json network-graph.json
 #   
@@ -13,15 +140,10 @@
 #       ip-map.json
 #       config-leaf.json
 
-# TODO: remove hardcoded params
-final_node=1
-starting_port=49200 # Starting port definition TODO: increment this? Right not this does not change
-leaf_connection_type='server'
-
 # make and or clear json obejcts
-echo {} >$2
-echo {} >$3
-echo {} >$4
+echo {} >$ip_map_file
+echo {} >$leaf_file
+echo {} >$graph_file
 
 # declare arrays for properties of network nodes
 declare -A node_type
@@ -60,7 +182,7 @@ for node_tx in "${network_node[@]}"; do
     IFS=',' read -ra tmp_edge_array <<< "$tmp"
 
     echo "Adding to network graph $tx_node_srn as network node=$node_tx"
-    python3 -m build_network_graph --network_file $4 --edges $tmp --tx_node $node_tx --tx_node_type $tx_node_type --final_node $final_node
+    python3 -m build_network_graph --network_file $graph_file --edges $tmp --tx_node $node_tx --tx_node_type $tx_node_type --final_node $final_node
 
     for node_rx in "${network_node[@]}"; do
 
@@ -155,13 +277,13 @@ for node_tx in "${network_node[@]}"; do
                     ### END INTEGRATION
 
                     # pass info to python sript to build json
-                    echo "Adding '${node_type["$node_tx"]}' server for node '$node_rx' : ip = '$rx_host_ip'"
-                    python3 -m build_ip_map_json --ip_file $2 --node_rx $node_rx --ip_rx $rx_host_ip --port_rx $a_port --type_tx "${node_type["$node_tx"]}" 
+                    echo "Adding ${node_type["$node_tx"]} connection to for $node_rx : ip = '$rx_host_ip'"
+                    python3 -m build_ip_map_json --ip_file $ip_map_file --node_rx $node_rx --ip_rx $rx_host_ip --port_rx $a_port --type_tx "${node_type["$node_tx"]}" 
                     
                     # use same info for leaf node if necessary
                     if [ "${is_leaf[$node_rx]}" -eq 1 ]; then
                         if [[ "${node_type["$node_rx"]}" ==  $leaf_connection_type ]]; then
-                            python3 -m build_leaf_json --leaf_file $3 --leaf_node $node_rx --ip $rx_host_ip --port $a_port --connection_type $leaf_connection_type
+                            python3 -m build_leaf_json --leaf_file $leaf_file --leaf_node $node_rx --ip $rx_host_ip --port $a_port --connection_type $leaf_connection_type
                             echo "Setting the leaf_host_ip IP for node $rx_node_srn($leaf_connection_type): $rx_host_ip"
                             is_leaf[$node_rx]=0 # indicate this has been taken care of
                         fi
@@ -251,7 +373,7 @@ for node_tx in "${network_node[@]}"; do
 
         ### END INTEGRATION
 
-        python3 -m build_leaf_json --leaf_file $3 --leaf_node $node_tx --ip $leaf_host_ip --port $a_port --connection_type $leaf_connection_type
+        python3 -m build_leaf_json --leaf_file $leaf_file --leaf_node $node_tx --ip $leaf_host_ip --port $a_port --connection_type $leaf_connection_type
         a_port=$((a_port+1)) # increment port
     fi
 

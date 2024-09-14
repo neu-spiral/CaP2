@@ -38,11 +38,11 @@ while IFS= read -r line; do
 
     # move locally built configs to nodes
     echo "Copying JSONs to node $srn_name($node_number)"
-    sshpass -p "$psswrd" scp "$ip_map_file" "$network_graph_file" "$srn_name":/root/CaP/colosseum
+    sshpass -p "$psswrd" scp "$ip_map_file" "$network_graph_file" "$leaf" "$srn_name":/root/CaP/colosseum
 
     # start servers on node 
     echo "Starting terminal session"
-    gnome-terminal -- bash -c "sshpass -p '$psswrd' ssh '$srn_name' 'cd /root/CaP && source env.sh && source ../cap-310/bin/activate && python3 run_split_model.py "colosseum/$ip_map_file" "colosseum/$network_graph_file" "$node_number" "$model_file"; bash'" &
+    gnome-terminal -- bash -c "sshpass -p '$psswrd' ssh '$srn_name' 'cd /root/CaP && source env.sh && source ../cap-310/bin/activate && python3 run_split_model.py "colosseum/$ip_map_file" "colosseum/$network_graph_file" "$node_number" "$model_file" "False"; bash'" &
 
     echo ""
     echo ""
