@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torchvision.models.feature_extraction import create_feature_extractor, get_graph_node_names
 import numpy as np
 import logging
+import os
 
 # Setup logging configuration
 logging.basicConfig(level=logging.DEBUG, 
@@ -77,6 +78,13 @@ class SplitManager:
 
         self.current_tensor = torch.zeros(self.get_full_layer_input_size(), dtype=self.dtype, device=self.device) # keep track of tensor I/O on this node. This is the size of the full tensor input for layer = current_layer
 
+        if 'split_layers_path' in self.configs:
+            split_layers_path = self.configs['split_layers_path']
+            self.split_layers = self.load_split_layers(split_layers_path)
+        else:
+            logging.warning('No split layers found to load from. Relying on loading from full model (slow execution)')
+            self.split_layers = {}
+        
     def add_extra_partition_logic(self, final_node):
         '''
             Extra splitting logic for final output of model 
@@ -690,64 +698,30 @@ class SplitManager:
                 logging.info('Saving current input. Swapping for input saved from start of block')
 
             # get the current module
-            # TODO: ideally we save the split layers beforehand and have them preloaded ready to be called
-            curr_layer = split_network.get_current_module(self.model, imodule)
-
-            # update communication I/O for this layer  
-            # TODO: prep this before running execution and give this it's own method
-            split_param_name = self.layer_names_fx[imodule] + '.weight'
-            if split_param_name in self.split_module_names:
-                # skip if machine doesn't expect input
-                if len(self.configs['partition'][split_param_name]['channel_id'][self.machine]) == 0:
-                    logging.warning(f'No input assigned to this machine (but it was sent input?). Skipping...')
+            # TODO: support other splitting splitting options for ADMM and implementaiton B
+            # TODO: remove loading from full model entirely. Keep full model checking optional 
+            input_channels, self.output_channel_map, do_comm = self.get_channels(imodule)
+            if len(self.split_layers) == 0:
+                # load from full model if split layers is empty 
+                curr_layer = split_network.get_current_module(self.model, imodule)
+                # make vertically split layer. TODO: remove this and replace curr_layer to be split_layer when first made 
+                if type(curr_layer) == torch.nn.Conv2d:
+                    split_layer = split_network.split_conv_layer(curr_layer, input_channels)
+                elif type(curr_layer) == torch.nn.BatchNorm2d:
+                    split_layer = split_network.split_bn_layer(curr_layer, input_channels)
+                elif type(curr_layer) == torch.nn.Linear:
+                    split_layer = split_network.split_linear_layer(curr_layer, input_channels)
+                else:
+                    logging.info(f'Skipping module {type(curr_layer).__name__}')
                     return -1, False
-
-                # TODO: reconsider implementation 
-                # What input channels does this machine compute?
-                input_channels = torch.tensor(self.configs['partition'][split_param_name]['channel_id'][self.machine],
-                        device=self.device)
-                N_in = len(input_channels) # TODO: is this used?
-
-                # Where to send output (map of output channels to different machines)
-                self.output_channel_map = self.configs['partition'][split_param_name]['filter_id']
-
-                do_comm = True
             else:
-                # for batch normal, and functional passes through the code
-                # TODO: address the following assumptions:
-                #       - assume all BN layers have C_in divisable by self.N_machines
-                #       - assume C_in are evenly split in sequential order WARNING THIS WILL BREAK WHEN WE START TO DO ASSIGN WEIGHTS TO DIFF MACHINES
-                N_Cin = curr_layer.num_features
-                Cin_per_machine = N_Cin/self.N_machines
-                if Cin_per_machine % 1 > 0:
-                    logging.error(f'Unexpected number of I/O for Batch Normal Module {imodule}')
-                Cin_per_machine = int(Cin_per_machine)
-                input_channels = np.arange(Cin_per_machine) + self.machine*Cin_per_machine
-                self.output_channel_map = [None]*self.N_machines
-                for i in range(self.N_machines):
-                    if i == self.machine:
-                        self.output_channel_map[i] = input_channels
-                    else:
-                        self.output_channel_map[i] = np.array([])
-                input_channels = torch.tensor(input_channels, device=self.device)
-
-                do_comm = False # no comm after BN layer
-
-            # make vertically split layer. TODO: remove this and replace curr_layer to be split_layer when first made 
-            if type(curr_layer) == torch.nn.Conv2d:
-                split_layer = split_network.split_conv_layer(curr_layer, input_channels)
-            elif type(curr_layer) == torch.nn.BatchNorm2d:
-                split_layer = split_network.split_bn_layer(curr_layer, input_channels)
-            elif type(curr_layer) == torch.nn.Linear:
-                split_layer = split_network.split_linear_layer(curr_layer, input_channels)
-            else:
-                logging.info(f'Skipping module {type(curr_layer).__name__}')
-                return -1, False
+                # grab from pre loaded split layers
+                split_layer = self.split_layers[self.layer_names_fx[imodule]]
             
             # eval split
             split_layer.eval()
             out_tensor = split_layer(curr_input.index_select(1, input_channels))
-            if type(curr_layer) == torch.nn.BatchNorm2d:
+            if type(split_layer) == torch.nn.BatchNorm2d:
                 # place bn output in lager tensor to maintain standardized output size
                 # TODO: change implementation to handle and use smallest tensor possible no matter bn or conv
                 tmp_out_tensor = torch.zeros(curr_input.shape, dtype=self.dtype)
@@ -759,7 +733,55 @@ class SplitManager:
             logging.debug(f'EXECUTED: #{imodule}-{exec_layer_name}')  
             logging.debug(f'SPLIT OUTPUT: Shape={list(out_tensor.shape)}; C_out={nonzero_output_channels.numpy()}')  
             return out_tensor, do_comm
-            
+
+    
+    def get_channels(self, imodule):
+        '''
+            Get the input channels and output channel map for layer=imodule
+        '''
+        # update communication I/O for this layer  
+        # TODO: prep this before running execution and give this it's own method
+        split_param_name = self.layer_names_fx[imodule] + '.weight'
+        if split_param_name in self.split_module_names:
+            # skip if machine doesn't expect input
+            if len(self.configs['partition'][split_param_name]['channel_id'][self.machine]) == 0:
+                logging.warning(f'No input assigned to this machine (but it was sent input?). Skipping...')
+                return -1, False
+
+            # TODO: reconsider implementation 
+            # What input channels does this machine compute?
+            input_channels = torch.tensor(self.configs['partition'][split_param_name]['channel_id'][self.machine],
+                    device=self.device)
+            N_in = len(input_channels) # TODO: is this used?
+
+            # Where to send output (map of output channels to different machines)
+            output_channel_map = self.configs['partition'][split_param_name]['filter_id']
+
+            do_comm = True
+        else:
+            # for batch normal, and functional passes through the code
+            # TODO: address the following assumptions:
+            #       - assume all BN layers have C_in divisable by self.N_machines
+            #       - assume C_in are evenly split in sequential order WARNING THIS WILL BREAK WHEN WE START TO DO ASSIGN WEIGHTS TO DIFF MACHINES
+            N_Cin = self.layer_output_size_LUT[self.layer_names_fx[imodule-1]][1]
+            Cin_per_machine = N_Cin/self.N_machines
+            if Cin_per_machine % 1 > 0:
+                logging.error(f'Unexpected number of I/O for Batch Normal Module {imodule}')
+            Cin_per_machine = int(Cin_per_machine)
+            input_channels = np.arange(Cin_per_machine) + self.machine*Cin_per_machine
+            output_channel_map = [None]*self.N_machines
+            for i in range(self.N_machines):
+                if i == self.machine:
+                    output_channel_map[i] = input_channels
+                else:
+                    output_channel_map[i] = np.array([])
+            input_channels = torch.tensor(input_channels, device=self.device)
+
+            do_comm = False # no comm after BN layer
+        
+        return input_channels, output_channel_map, do_comm
+
+
     def final_output_routine(self, input_tensor):
         '''
             Handle final layer output (assumed linear layer)
@@ -770,3 +792,62 @@ class SplitManager:
         vertical_output = self.add_bias_to_linear()
         
         return vertical_output, True
+
+
+    def save_split_layers(self, output_path):
+        '''
+            Saves each split layer for this machine to a file 
+        '''
+
+        for layer in range(self.starting_layer, self.final_layer):
+            
+            curr_layer_name = self.layer_names_fx[layer]
+
+            # is final layer
+            is_final_layer = self.total_layers_fx-1 == layer
+            is_operation = any([ el in curr_layer_name for el in ['relu', 'add', 'avg_pool2d', 'size', 'view', 'x'] ])
+            if not (is_final_layer or is_operation):
+                # get layer from full module
+                curr_layer = split_network.get_current_module(self.model, layer)
+                input_channels = self.get_channels(layer)[0]
+
+                # prep split version
+                if type(curr_layer) == torch.nn.Conv2d:
+                    split_layer = split_network.split_conv_layer(curr_layer, input_channels)
+                elif type(curr_layer) == torch.nn.BatchNorm2d:
+                    split_layer = split_network.split_bn_layer(curr_layer, input_channels)
+                elif type(curr_layer) == torch.nn.Linear:
+                    split_layer = split_network.split_linear_layer(curr_layer, input_channels)
+                else:
+                    print(f'Skipping module {type(curr_layer).__name__}')
+                
+                # save
+                #curr_module_name = curr_layer_name.replace('.', '-')
+                curr_machine_path = os.path.join(output_path,f'machine-{self.machine}')
+                fpath = os.path.join(curr_machine_path, f'{curr_layer_name}.pth')
+                torch.save(split_layer, fpath)
+
+
+    def load_split_layers(self, split_layer_dir):
+        '''
+            Load each split layer assigned to this machine
+        '''
+
+        split_layers = {} # init dictionary 
+
+        for layer in range(self.starting_layer, self.final_layer+1):
+            curr_layer_name = self.layer_names_fx[layer]
+            
+            is_final_layer = self.total_layers_fx-1 == layer
+            is_operation = any([ el in curr_layer_name for el in ['relu', 'add', 'avg_pool2d', 'size', 'view', 'x'] ])
+
+            # assign to  struct if split layer
+            if not (is_final_layer or is_operation):
+                layer_path = os.path.join(split_layer_dir, f'{curr_layer_name}.pth')
+                split_layers[curr_layer_name] = torch.load(layer_path, map_location=self.device).eval()
+
+        return split_layers
+
+
+            
+        

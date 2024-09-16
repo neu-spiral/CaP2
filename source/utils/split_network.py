@@ -22,30 +22,15 @@
         - add main
 '''
 
-from source.core.engine import MoP
-from source.core import run_partition as run_p
 from os import environ
-from source.utils.dataset import *
-from source.utils.misc import *
-
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-
-from source.models import resnet
-
-import torch.nn.functional as F
-
+import sys
 import numpy as np
+import torch.nn as nn
 
-from source.utils import io
-from source.utils import testers
+from source.utils.dataset import *
 from source.core import engine
-import json
-import itertools
-
-from torchsummary import summary
-
-import time
+from source.utils import misc
+from source.core import run_partition
 
 from torchvision.models.feature_extraction import create_feature_extractor, get_graph_node_names
 
@@ -333,6 +318,35 @@ def combine_all_inputs(input_struct, num_machines):
                     
     return combined_input
 
+def config_setup_resnet(num_nodes, model_file_path):
+    '''  
+        Construct the  config for how the model should be split 
+        TODO: avoid having to load model here, should only be loaded once in split manager
+
+        Input:
+            num_nodes -- (int) number of network nodes. This splits the model evenly between all nodes
+    '''
+
+    # setup config
+    sys.argv = [sys.argv[0]] # clear sys args 
+    dataset='cifar10' # TODO: automatically determine from inputs  
+    environ["config"] = f"config/{dataset}.yaml"
+    configs = run_partition.main()
+
+    configs["device"] = "cpu"
+    configs['load_model'] = model_file_path
+    configs["num_partition"] = str(num_nodes)
+    configs['dtype'] = 'float32'
+
+    # load model 
+    model = misc.get_model_from_code(configs).to(configs['device']) 
+
+    # populate config
+    input_var = engine.get_input_from_code(configs)
+    configs = engine.partition_generator(configs, model) # Config partitions and prune_ratio
+    configs['partition'] = engine.featuremap_summary(model, configs['partition'], input_var) # Compute output size of each layer
+
+    return configs
 
 def main():
     print()

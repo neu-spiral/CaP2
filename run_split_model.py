@@ -12,7 +12,7 @@ import logging
 import torch.types
 
 # Setup logging configuration
-logging.basicConfig(level=logging.INFO, 
+logging.basicConfig(level=logging.DEBUG, 
                     format='%(asctime)s - %(levelname)s - %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -27,34 +27,6 @@ except:
     from source.core import split_manager, run_partition, engine
     from source.utils import misc, split_network
     from source.SplitModelNetworking import node    
-
-
-def config_setup(num_nodes, model_file_path):
-    '''  
-        Construct the  config for how the model should be split 
-        TODO: avoid having to load model here, should only be loaded once in split manager
-    '''
-
-    # setup config
-    sys.argv = [sys.argv[0]]
-    dataset='cifar10' # TODO: automatically determine from inputs  
-    environ["config"] = f"config/{dataset}.yaml"
-    configs = run_partition.main()
-
-    configs["device"] = "cpu"
-    configs['load_model'] = model_file_path
-    configs["num_partition"] = str(num_nodes)
-    configs['dtype'] = 'float32'
-
-    # load model 
-    model = misc.get_model_from_code(configs).to(configs['device']) 
-
-    # populate config
-    input_var = engine.get_input_from_code(configs)
-    configs = engine.partition_generator(configs, model) # Config partitions and prune_ratio
-    configs['partition'] = engine.featuremap_summary(model, configs['partition'], input_var) # Compute output size of each layer
-
-    return configs
 
 def get_input_tensor(collected_data):
     '''
@@ -79,7 +51,7 @@ def main():
     parser.add_argument('ip_map_file', type=str, help='Path to ip map JSON file')
     parser.add_argument('network_graph_file', type=str, help='Path to network graph JSON file')
     parser.add_argument('node', type=int, help='Node in the network to launch server for')
-    parser.add_argument('model_file', type=str, help='File path to model')
+    parser.add_argument('model_file', type=str, help='File model file name e.g. cifar10-resnet18-kernel-npv0-pr0.75-lcm0.001.pt')
     parser.add_argument('--debug', action=argparse.BooleanOptionalAction)
     parser.add_argument('debug', choices=['True', 'False'], default='True', help='Check each output tensor of split model')
     args = parser.parse_args()
@@ -89,7 +61,11 @@ def main():
     logging.info(f"Required Clients: {required_clients}")
 
     # make split manager for executing split execution 
-    configs = config_setup(num_nodes, args.model_file)
+    # TODO: generalize 
+    configs = split_network.config_setup_resnet(num_nodes, args.model_file)
+    # file path for split layers
+    configs['split_layers_path'] = os.path.join('assets','models',f'vsplit-{args.model_file[:-3]}', f'machine-{args.node}')
+
     input_tensor = torch.rand(1, 3, 32, 32, device=torch.device(configs['device']))
     if 'dtype' in configs:
         if configs['dtype'] == 'float64':
@@ -100,9 +76,9 @@ def main():
             logging.error('Unsupported dtype')
     else:
         logging.warning('No dtype field found in config')
+    
 
-    imach = args.node # get network node ID number
-    model_manager = split_manager.SplitManager(configs, imach, num_nodes, input_tensor, final_node, args.debug == 'True')
+    model_manager = split_manager.SplitManager(configs, args.node, num_nodes, input_tensor, final_node, args.debug == 'True')
 
     # open ip map 
     with open(args.ip_map_file, 'r') as file:
