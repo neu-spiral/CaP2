@@ -9,6 +9,7 @@ from torchvision.models.feature_extraction import create_feature_extractor, get_
 import numpy as np
 import logging
 import os
+import sys
 
 # Logger initialization
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ logger.setLevel(logging.DEBUG)
 
 # Create handlers: one for file and one for console
 file_handler = logging.FileHandler('logfile.log')
-console_handler = logging.StreamHandler()
+console_handler = logging.StreamHandler(sys.stdout)
 
 # Set the logging level for each handler (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 file_handler.setLevel(logging.DEBUG)
@@ -59,9 +60,9 @@ class SplitManager:
             elif configs['dtype'] == 'float32':
                 self.dtype = torch.float32
             else:
-                logging.error('Unsupported dtype')
+                logger.error('Unsupported dtype')
         else:
-            logging.warning('No dtype field found in config')
+            logger.warning('No dtype field found in config')
         self.output_channel_map = None
         self.device = configs['device']
 
@@ -100,7 +101,7 @@ class SplitManager:
             split_layers_path = self.configs['split_layers_path']
             self.split_layers = self.load_split_layers(split_layers_path)
         else:
-            logging.warning('No split layers found to load from. Relying on loading from full model (slow execution)')
+            logger.warning('No split layers found to load from. Relying on loading from full model (slow execution)')
             self.split_layers = {}
         
     def add_extra_partition_logic(self, final_node):
@@ -125,7 +126,7 @@ class SplitManager:
             self.configs['partition']['FINAL_MODEL_OUTPUT.weight'] = { 'channel_id' : [np.array([])]*self.N_machines }
             self.configs['partition']['FINAL_MODEL_OUTPUT.weight']['channel_id'][final_node] = np.arange(N_cout_linear) # send all outputs to machine final_node
         else:
-            logging.warning(f'Did not add any logic for final execution of {model_name} model')
+            logger.warning(f'Did not add any logic for final execution of {model_name} model')
 
     def update_horz_output(self, input_tensor):
         '''
@@ -219,6 +220,7 @@ class SplitManager:
         do_comm = False
         while not do_comm:
             split_layer_output, do_comm = self.execute_split_layer(self.current_tensor, self.current_layer) # execute split layer
+            logger.info(f'Executed layer={self.current_layer} {self.get_current_layer_name()}')
             self.init_current_tensor(split_layer_output)
 
             if self.debug and not do_comm:
@@ -242,9 +244,9 @@ class SplitManager:
 
             # debug
             curr_layer_name = self.layer_names_fx[-1]
-            logging.debug(f'FINAL TENSOR FOR: #{self.current_layer}-{curr_layer_name}; Shape={list(self.current_tensor.shape)}')
-            logging.debug(f'SPLIT OUTPUT: {self.current_tensor}')
-            logging.debug(f'FULL OUTPUT: {self.horz_output[self.layer_names_fx[-2]]}')
+            logger.debug(f'FINAL TENSOR FOR: #{self.current_layer}-{curr_layer_name}; Shape={list(self.current_tensor.shape)}')
+            logger.debug(f'SPLIT OUTPUT: {self.current_tensor}')
+            logger.debug(f'FULL OUTPUT: {self.horz_output[self.layer_names_fx[-2]]}')
         else:
             # prep mask for this node
             out_channel_array = torch.arange(out_tensor.shape[1]) # all indexes of full output
@@ -261,7 +263,7 @@ class SplitManager:
 
             # debug
             curr_layer_name = self.get_current_layer_name()
-            logging.debug(f'INITIALIZING CURRENT TENSOR FOR: #{self.current_layer}-{curr_layer_name}; Shape={list(tmp.shape)}; C_in={output_channels.numpy()}')  
+            #logger.debug(f'INITIALIZING CURRENT TENSOR FOR: #{self.current_layer}-{curr_layer_name}; Shape={list(tmp.shape)}; C_in={output_channels.numpy()}')  
 
 
     def get_last_partition(self):
@@ -333,19 +335,19 @@ class SplitManager:
         truth_output = self.horz_output[output_layer_name]
         
         if torch.is_tensor(truth_output):
-            logging.debug(f'Checking output from {output_layer_name} C_in {input_channels}: ')
+            #logger.debug(f'Checking output from {output_layer_name} C_in {input_channels}: ')
             max_diff, max_by_Cout, print_str = SplitManager.compare_helper(self.current_tensor[:,input_channels,], truth_output[:,input_channels,])
-            logging.debug('\n\n')
+            #logger.debug('\n\n')
 
             if max_diff > limit or is_final_layer:
-                logging.error('ERROR:')
-                logging.error(print_str)
+                logger.error('ERROR:')
+                logger.error(print_str)
                 return 0
             else:
                 return 1 
         else:
             # handles "size" layer that doesn't output anything (e.g. truth_output = 1)
-            logging.debug(f'Skipping check for output {output_layer_name} (no tensor found for ref.) ')
+            #logger.debug(f'Skipping check for output {output_layer_name} (no tensor found for ref.) ')
             return 1
 
     def expected_comms_for_layer(self, network_node, layer):
@@ -413,20 +415,20 @@ class SplitManager:
         expected_comms = self.expected_comms_for_layer(self.machine, self.current_layer)
 
         if len(expected_comms) == 0:
-            logging.info(f'No comms needed to start layer {self.current_layer}')
+            logger.info(f'No comms needed to start layer {self.current_layer}')
             return 1
         elif len(rx_from_nodes) < len(expected_comms):
-            logging.info(f'Too few inputs for layer={self.current_layer}')
-            logging.debug(f'\t\t Collected inputs from nodes: {rx_from_nodes}')
-            logging.debug(f'\t\t Need inputs from nodes: {expected_comms}')
+            logger.info(f'Too few inputs for layer={self.current_layer}')
+            logger.debug(f'\t\t Collected inputs from nodes: {rx_from_nodes}')
+            logger.debug(f'\t\t Need inputs from nodes: {expected_comms}')
             return 0
         elif len(rx_from_nodes) > len(expected_comms):
-            logging.warning(f'Too many inputs for layer={self.current_layer}')
+            logger.warning(f'Too many inputs for layer={self.current_layer}')
             return 2
         elif np.all(rx_from_nodes == expected_comms):
             return 1
         else:
-            logging.warning(f'Received unexpected inputs for layer={self.current_layer}')
+            logger.warning(f'Received unexpected inputs for layer={self.current_layer}')
             return 1
 
     def prep_output(self, out_tensor):
@@ -449,7 +451,7 @@ class SplitManager:
                     Cin - (1 x Cin' list) maps Cin' dimension to dimension in Cin of full input to this layer
 
         '''
-        logging.debug(f'\t\tOutput tensor shape : {out_tensor.shape}')
+        #logger.debug(f'\t\tOutput tensor shape : {out_tensor.shape}')
 
         # debug
         #nonzero_out_tensor = torch.unique(torch.nonzero(out_tensor, as_tuple=True)[1])
@@ -490,8 +492,8 @@ class SplitManager:
                 output_element['tensor'] = out_tensor[:,communication_out_mask,]
 
                 curr_layer_name = self.get_current_layer_name()
-                logging.debug(f'Machine={self.machine}, Layer to execute = {self.current_layer}:{curr_layer_name}.')
-                logging.debug(f'Prepping to send C_out {communication_out_channels} to machine {rx_mach}')
+                #logger.debug(f'Machine={self.machine}, Layer to execute = {self.current_layer}:{curr_layer_name}.')
+                #logger.debug(f'Prepping to send C_out {communication_out_channels} to machine {rx_mach}')
             else:
                 output_element['is_empty'] =True
 
@@ -655,32 +657,32 @@ class SplitManager:
             # skip this machine+module if there is no input to compute 
             if not torch.is_tensor(curr_input):
                 if 'bn' in self.layer_names_fx[imodule]:
-                    logging.info('No input received but bn still needs to produce output.')
+                    logger.info('No input received but bn still needs to produce output.')
                     curr_input = torch.zeros(self.get_input_size(imodule), dtype=self.dtype,  device=self.device)
                 else:
-                    logging.info('No input sent to this machine. Skipping module')
+                    logger.info('No input sent to this machine. Skipping module')
                     return -1, False
             
-            logging.debug(f'Current input channels {split_network.get_nonzero_channels(curr_input)}')
+            #logger.debug(f'Current input channels {split_network.get_nonzero_channels(curr_input)}')
             
             # non-comms operations 
             if imodule == self.total_layers_fx-1:
                 return self.final_output_routine(curr_input)
             elif 'relu' in self.layer_names_fx[imodule]:
-                logging.info('Applying ReLU')
+                #logger.info('Applying ReLU')
                 return F.relu(curr_input), False
                 
             elif 'add' in self.layer_names_fx[imodule]:
                 # residual layer. No comm necessary 
                 if self.machine in self.residual_input:
-                    logging.info('Adding residual')
+                    logger.info('Adding residual')
                     if 'block_out' in self.residual_input[self.machine]:
                         curr_input = curr_input + self.residual_input[self.machine]['block_out']
                     elif 'block_in' in self.residual_input[self.machine]:
                         curr_input = curr_input + self.residual_input[self.machine]['block_in']
-                        logging.info('Assuming shortcut had no layers')
+                        logger.info('Assuming shortcut had no layers')
                 else:
-                    logging.info('Assuming this machine did not receive any input at the beginning of this block. No residual found')
+                    logger.info('Assuming this machine did not receive any input at the beginning of this block. No residual found')
 
                 # erase stored 
                 self.residual_input[self.machine] = {}
@@ -688,19 +690,19 @@ class SplitManager:
                 return curr_input, False
             
             elif 'avg_pool2d' in self.layer_names_fx[imodule]:
-                logging.info('Average pooling')
+                #logger.info('Average pooling')
                 return F.avg_pool2d(curr_input, 4), False
             
             elif 'size' in self.layer_names_fx[imodule]:
-                logging.info('Skipping')
+                #logger.info('Skipping')
                 return curr_input, False
             
             elif 'view' in self.layer_names_fx[imodule]:
-                logging.info('Reshaping (view)')
+                #logger.info('Reshaping (view)')
                 return curr_input.view(curr_input.size(0), -1), False
                 
             elif 'x' == self.layer_names_fx[imodule]:
-                logging.info('Model input layer.. skipping')
+                #logger.info('Model input layer.. skipping')
                 return curr_input, False
             
             # swap out io for residual connection
@@ -708,12 +710,12 @@ class SplitManager:
                 # save input for later 
                 self.residual_input[self.machine] = {}
                 self.residual_input[self.machine]['block_in'] = curr_input.detach().clone()
-                logging.info('Saving input for later...')
+                logger.info('Saving input for later...')
             elif imodule in self.residual_connection_start:
                 # swap tensors
                 self.residual_input[self.machine]['block_out'] = curr_input
                 curr_input = self.residual_input[self.machine]['block_in'] 
-                logging.info('Saving current input. Swapping for input saved from start of block')
+                logger.info('Saving current input. Swapping for input saved from start of block')
 
             # get the current module
             # TODO: support other splitting splitting options for ADMM and implementaiton B
@@ -730,7 +732,7 @@ class SplitManager:
                 elif type(curr_layer) == torch.nn.Linear:
                     split_layer = split_network.split_linear_layer(curr_layer, input_channels)
                 else:
-                    logging.info(f'Skipping module {type(curr_layer).__name__}')
+                    logger.info(f'Skipping module {type(curr_layer).__name__}')
                     return -1, False
             else:
                 # grab from pre loaded split layers
@@ -748,8 +750,8 @@ class SplitManager:
             
             exec_layer_name = self.get_layer_name(imodule)
             nonzero_output_channels = split_network.get_nonzero_channels(out_tensor)
-            logging.debug(f'EXECUTED: #{imodule}-{exec_layer_name}')  
-            logging.debug(f'SPLIT OUTPUT: Shape={list(out_tensor.shape)}; C_out={nonzero_output_channels.numpy()}')  
+            #logger.debug(f'EXECUTED: #{imodule}-{exec_layer_name}')  
+            #logger.debug(f'SPLIT OUTPUT: Shape={list(out_tensor.shape)}; C_out={nonzero_output_channels.numpy()}')  
             return out_tensor, do_comm
 
     
@@ -763,7 +765,7 @@ class SplitManager:
         if split_param_name in self.split_module_names:
             # skip if machine doesn't expect input
             if len(self.configs['partition'][split_param_name]['channel_id'][self.machine]) == 0:
-                logging.warning(f'No input assigned to this machine (but it was sent input?). Skipping...')
+                logger.warning(f'No input assigned to this machine (but it was sent input?). Skipping...')
                 return -1, False
 
             # TODO: reconsider implementation 
@@ -784,7 +786,7 @@ class SplitManager:
             N_Cin = self.layer_output_size_LUT[self.layer_names_fx[imodule-1]][1]
             Cin_per_machine = N_Cin/self.N_machines
             if Cin_per_machine % 1 > 0:
-                logging.error(f'Unexpected number of I/O for Batch Normal Module {imodule}')
+                logger.error(f'Unexpected number of I/O for Batch Normal Module {imodule}')
             Cin_per_machine = int(Cin_per_machine)
             input_channels = np.arange(Cin_per_machine) + self.machine*Cin_per_machine
             output_channel_map = [None]*self.N_machines
@@ -805,7 +807,7 @@ class SplitManager:
             Handle final layer output (assumed linear layer)
         '''
 
-        logging.info('FINISHED MODEL EXECUTION')
+        logger.info('FINISHED MODEL EXECUTION')
 
         vertical_output = self.add_bias_to_linear()
         

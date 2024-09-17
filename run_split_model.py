@@ -19,7 +19,7 @@ logger.setLevel(logging.DEBUG)
 
 # Create handlers: one for file and one for console
 file_handler = logging.FileHandler('logfile.log')
-console_handler = logging.StreamHandler()
+console_handler = logging.StreamHandler(sys.stdout)
 
 # Set the logging level for each handler (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 file_handler.setLevel(logging.DEBUG)
@@ -40,8 +40,8 @@ try:
     from source.SplitModelNetworking import node
 except:
     sys.path.append(os.path.join(os.path.dirname(__name__), "..\source"))
-    logging.warning(f"Current working directory: {os.getcwd()}")
-    logging.warning(f"Updated sys.path: {sys.path}")
+    logger.warning(f"Current working directory: {os.getcwd()}")
+    logger.warning(f"Updated sys.path: {sys.path}")
     from source.core import split_manager, run_partition, engine
     from source.utils import misc, split_network
     from source.SplitModelNetworking import node    
@@ -76,7 +76,8 @@ def main():
 
     # figure out who this machine/network node receives from 
     required_clients, connection_type, num_nodes, final_node = node.load_config(args.ip_map_file, args.network_graph_file, args.node)
-    logging.info(f"Required Clients: {required_clients}")
+    logger.info(f'Starting server for node {args.node}')
+    logger.info(f"Required Clients: {required_clients}")
 
     # make split manager for executing split execution 
     # TODO: generalize 
@@ -93,7 +94,7 @@ def main():
         else:
             logging.error('Unsupported dtype')
     else:
-        logging.warning('No dtype field found in config')
+        logger.warning('No dtype field found in config')
     
 
     model_manager = split_manager.SplitManager(configs, args.node, num_nodes, input_tensor, final_node, args.debug == 'True')
@@ -109,7 +110,10 @@ def main():
     server_threads = []
     index = 0
     for a_server in node_servers:
-        server_threads += [threading.Thread(target=node.server, args=(a_server['ip'], a_server['port'], required_clients, client_data_queue))]
+        server_ip = a_server['ip']
+        server_port = a_server['port']
+        logger.info(f'Node {args.node} starting server on {server_ip}:{server_port}')
+        server_threads += [threading.Thread(target=node.server, args=(server_ip, server_port, required_clients, client_data_queue))]
         server_threads[index].start()
         index += 1
 
@@ -120,12 +124,11 @@ def main():
 
             # shut down server if machine is finished 
             if model_manager.is_done():
-                    logging.info(f'Machine {model_manager.machine} has finished calculations. Shutting down...')
-                    for iserver in range(len(server_threads)):
-                        server_threads[iserver].join()  # Wait for the server thread to finish
-                    return True # end execution
+                logger.info(f'Machine {model_manager.machine} has finished calculations. Shutting down...')
+                for iserver in range(len(server_threads)):
+                    server_threads[iserver].join()  # Wait for the server thread to finish
+                return True # end execution
 
-            
             # updates local tensor if enough input is present 
             enough_input = model_manager.process_input(collected_data) 
 
@@ -137,12 +140,13 @@ def main():
                     input_tensor = get_input_tensor(collected_data)
                     if torch.is_tensor(input_tensor):
                         model_manager.update_horz_output(input_tensor)
-                        logging.info('Updating input tensor')
                     else:
-                        logging.warning('Could not find input tensor')
+                        logger.warning('Could not find input tensor')
 
                 # execute split layers
+                logger.debug('Execute layers start layer')
                 output_tensor = model_manager.execute_layers_until_comms()
+                logger.debug('Execute layers end')
 
                 # always send output unless on final layer
                 if not model_manager.current_layer == model_manager.total_layers_fx:
@@ -150,6 +154,7 @@ def main():
                     processed_output = model_manager.prep_output(output_tensor) # prepare communication
                         
                     # send data to correct node in network 
+                    logger.debug('Send to nodes start')
                     node.send_to_nodes(processed_output, ip_map, connection_type)
 
                     # remove data from the queue that was processed already 
@@ -161,7 +166,7 @@ def main():
             # Optionally, add a sleep interval to avoid high CPU usage
             time.sleep(5)
     except KeyboardInterrupt:
-        logging.info("Shutting down...")
+        logger.info("Shutting down...")
         for iserver in range(len(server_threads)):
             server_threads[iserver].join()  # Wait for the server thread to finish
 
