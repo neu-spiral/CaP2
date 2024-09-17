@@ -196,22 +196,28 @@ def get_esc_data(data_folder_path, batch_size=64):
             test_input = test_input + paths_test
 
             if selection == 'Radar':
-                train_label = np.concatenate((train_label, np.ones(len(paths_train))))
-                test_label = np.concatenate((test_label, np.ones(len(paths_test))))
+                train_label = np.concatenate((train_label, np.ones(len(paths_train), dtype=int)))
+                test_label = np.concatenate((test_label, np.ones(len(paths_test), dtype=int)))
             else:
-                train_label = np.concatenate((train_label, np.zeros(len(paths_train))))
-                test_label = np.concatenate((test_label, np.zeros(len(paths_test))))
+                train_label = np.concatenate((train_label, np.zeros(len(paths_train), dtype=int)))
+                test_label = np.concatenate((test_label, np.zeros(len(paths_test), dtype=int)))
 
         xtrain += (fetch_esc_data(train_input),)
         xtest += (fetch_esc_data(test_input),)
 
+        # print('xtrain shape:', len(xtrain))
+        # print('xtrain shape:', len(xtrain[0]))
+        # print(xtrain)
+
         ytrain = np.concatenate((ytrain, train_label))
         ytest = np.concatenate((ytest, test_label))
+        # ytrain += (train_label,)
+        # ytest += (test_label,)
 
     # for i in tqdm(range(len(data_train)-1)):
     #     xtrain += (fetch_esc_data(data_train[i]),)
     #     xtest += (fetch_esc_data(data_test[i]),)
-    
+
     params = {'batch_size': batch_size,
               'shuffle': True,
               'num_workers': 0,}
@@ -234,6 +240,7 @@ class ESCDataLoader(object):
             x.append(torch.from_numpy(self.ds[i][index]))
         label = self.label[index]
         return x[0],x[1],x[2],x[3],x[4],torch.tensor(label, dtype=torch.int8).type(torch.LongTensor)
+        # return x,torch.tensor(label, dtype=torch.int8).type(torch.LongTensor)
 
     def __len__(self):
         return len(self.ds[0])  # assume both datasets have same length
@@ -242,10 +249,14 @@ def fetch_esc_data(data):
     x = []
     for image_path in data:
         image = Image.open(image_path) #(677,532,3)
+        # print('image',image.size)
         image = np.asarray(image.resize((320,266)))
+        # print('image',image.shape)
         
         image = image/255.
+        # print('image',image.shape)
         image = np.moveaxis(image, -1, 0)
+        # print('image',image.shape)
         #dimensions = self.args.input_dims   #(512,512)
         #image = cv2.resize(image, dimensions)
         x.append(image)

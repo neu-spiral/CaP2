@@ -223,7 +223,9 @@ class SplitManager:
             split_param_name = self.layer_names_fx[imodule] + '.weight'
             # print(f'split_param_name: {split_param_name}')
             # print(f'self.split_module_names: {self.split_module_names}')
-            if type(curr_layer) == nn.Linear and imodule == self.total_layers_fx-1:
+            
+            # if type(curr_layer) == nn.Linear and imodule == self.total_layers_fx-1:
+            if imodule == self.total_layers_fx-1:
                 # if final layer output all goes to machine 0 
                 # TODO: find better way to handle this. Also will we encounter Linear layers not at the end of the model
                 N_Cin = curr_layer.in_features

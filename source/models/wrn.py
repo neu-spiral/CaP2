@@ -29,7 +29,7 @@ class BasicBlock(nn.Module):
         self.droprate = dropRate
         # self.dropout = nn.Dropout(p=self.droprate, training=self.training)
         self.equalInOut = (in_planes == out_planes)
-        self.convShortcut = (not self.equalInOut) and nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride,
+        self.shortcut = (not self.equalInOut) and nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride,
                                padding=0, bias=False) or None
 
     def forward(self, x):
@@ -41,7 +41,7 @@ class BasicBlock(nn.Module):
         if self.droprate > 0:
             out = F.dropout(out, p=self.droprate, training=self.training)
         out = self.conv2(out)
-        return torch.add(x if self.equalInOut else self.convShortcut(x), out)
+        return torch.add(x if self.equalInOut else self.shortcut(x), out)
 
 # class NetworkBlock(nn.Module):
 #     def __init__(self, nb_layers, in_planes, out_planes, block, stride, dropRate, conv_layer, bn_layer, bn_partition):

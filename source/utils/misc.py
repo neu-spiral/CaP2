@@ -96,7 +96,8 @@ def set_optimizer(configs, model, train_loader, opt, lr, epochs):
 
     # criterion
     if configs['data_code'] == 'esc':
-        #criterion = nn.BCEWithLogitsLoss()
+        # criterion = nn.BCEWithLogitsLoss().to(configs['device'])
+        # criterion = nn.BCELoss().to(configs['device'])
         criterion = CrossEntropyLossMaybeSmooth(smooth_eps=configs['smooth_eps']).to(configs['device'])
     else:
         criterion = CrossEntropyLossMaybeSmooth(smooth_eps=configs['smooth_eps']).to(configs['device'])

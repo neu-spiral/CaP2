@@ -10,19 +10,11 @@ cuda_device=2
 # dataset=cifar100
 # model=wrn28
 
-dataset=esc
-model=escnet
+# dataset=esc
+# model=escnet
 
-# dataset=flash
-# model=flashnet
-
-
-# Select teacher model with respect to the dataset and model:
-
-# teacher=cifar10-resnet18-kernel-npv0.pt
-# teacher=cifar100-wrn28-kernel-npv0.pt
-teacher=esc-escnet-kernel-npv0.pt
-# teacher=flash-flashnet-kernel-npv0.pt
+dataset=flash
+model=flashnet
 
 
 # Put this below as a parameter in order to avoid pre-training, and use a teacher model. If not, pre-training will be performed:
@@ -47,7 +39,7 @@ num_partitions=4
 
 
 
-
+##### NO LONGER FILE VERSIONS, USES INTEGER INSTEAD #####
 # # For yaml file selection, parameter is '-np config/${model}-$2.yaml':
 
 # yaml_version=1
@@ -57,10 +49,10 @@ num_partitions=4
 
 
 
-
+teacher=${dataset}-${model}.pt
 prune_finetune() {
     st=$5
-    save_name=${dataset}-${model}-$5-np$2-pr$4-lcm$3
+    save_name=${dataset}-${model}-$5-np${num_partitions}-pr$4-lcm$3
     # save_name=${dataset}-${model}-$5-np$2-vers${version}-pr$4-lcm$3-lm${teacher}
     python -m source.core.run_partition -cfg config/${dataset}.yaml \
         -mf ${save_name}.pt \

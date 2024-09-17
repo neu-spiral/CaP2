@@ -41,7 +41,7 @@ class ResLike(nn.Module):
         # self.layer3 = nn.Sequential(block(32, 32, pool_kernel=2))
         # self.layer4 = nn.Sequential(block(32, 32, pool_kernel=2))
         
-        # self.linear1 = nn.Linear(4160, 512)
+        # self.linear1 = nn.Linear(4160, 512, bias=False)
         self.linear1 = nn.Linear(10240, 512, bias=False)
         self.linear2 = nn.Linear(512, 256, bias=False)
         # self.linear3 = nn.Linear(256, 256, bias=False)
@@ -55,7 +55,7 @@ class ResLike(nn.Module):
     # def forward(self, *x):
     def forward(self, x):
         # if isinstance(x, tuple) and len(x)>1:
-        # x = torch.cat((x[0],x[1],x[2],x[3],x[4]), dim=1)
+        #     x = torch.cat((x[0],x[1],x[2],x[3],x[4]), dim=1)
         # FOR CNN BASED IMPLEMENTATION
         out = self.max_pool(self.relu(self.bn(self.conv1(x))))
         out = self.layer1(out)
@@ -68,6 +68,8 @@ class ResLike(nn.Module):
         
         x = self.relu(self.linear1(x))
         x = self.relu(self.linear2(x))
+        # x = self.relu(self.linear3(x))
+        # x = F.sigmoid(self.out(x))  # no softmax: CrossEntropyLoss()
         x = self.out(x)  # no softmax: CrossEntropyLoss()
         return x
     

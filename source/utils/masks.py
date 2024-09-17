@@ -4,12 +4,21 @@ import torch
 import numpy as np
 import time
 import itertools
-def partition_generator(configs, model):
-    partition = {}
+
+def create_partition(configs, model):
+
+    class MyDumper(yaml.SafeDumper):
+        def increase_indent(self, flow=False, indentless=False):
+            return super(MyDumper, self).increase_indent(flow=flow, indentless=indentless)
+
+    def represent_list(dumper, data):
+        return dumper.represent_sequence('tag:yaml.org,2002:seq', data, flow_style=True)
+
+    MyDumper.add_representer(list, represent_list)
+
+    # partition = {}
     num_partition = {}
-        
-    # get # partition for each layer
-    if configs['num_partition'].isdigit():
+    if isinstance(configs['num_partition'], int):
         # Todo: automatically set bn_partition
         ratio_partition, map_partition = {}, {}
         bn_partition = [int(configs['num_partition'])] * 9
@@ -22,21 +31,58 @@ def partition_generator(configs, model):
                     ratio_partition[name] = [1]*num
                     np.fill_diagonal(maps, 0)
                     map_partition[name] = maps.astype(int).tolist()
-                
-    elif os.path.exists(configs['num_partition']):
-        with open(configs['num_partition'], "r") as stream:
-            raw_dict = yaml.safe_load(stream)
-            
-            bn_partition = raw_dict['bn_partitions']
-            ratio_partition = raw_dict['partitions']
-            map_partition = raw_dict['maps']
-            
-            # print(ratio_partition,map_partition)
-            for name, key in ratio_partition.items():
-                ratio_partition[name] = key[0]
-                num_partition[name] = len(key[0])
+        full_dict = {'bn_partitions': bn_partition, 'partitions': ratio_partition, 'maps': map_partition}
+        with open(configs['partition_path'], "w") as stream:
+            yaml.dump(full_dict, stream, Dumper=MyDumper, default_flow_style=False)
     else:
-        raise Exception("num_partition must be either a filepath or an integer")
+        raise Exception("num_partition must be an integer to initialize partition")
+
+
+def partition_generator(configs, model):
+    partition = {}
+    num_partition = {}
+    # print(configs['num_partition'])
+        
+    # # get # partition for each layer
+    # if isinstance(configs['num_partition'], int):
+    #     # Todo: automatically set bn_partition
+    #     ratio_partition, map_partition = {}, {}
+    #     bn_partition = [int(configs['num_partition'])] * 9
+    #     num = int(configs['num_partition'])
+    #     maps = np.ones((num,num))
+    #     for name, W in itertools.chain(model.named_parameters() , list({'inputs':None}.items())):
+    #         print(name)
+    #         try:
+    #             print(W.size())
+    #         except:
+    #             pass
+    #         if name=='inputs' or (len(W.size()) == 4) or (len(W.size()) == 2):
+    #             if not 'out' in name:                  
+    #                 num_partition[name] = num
+    #                 ratio_partition[name] = [1]*num
+    #                 np.fill_diagonal(maps, 0)
+    #                 map_partition[name] = maps.astype(int).tolist()
+                
+    # elif os.path.exists(configs['num_partition']):
+    with open(configs['partition_path'], "r") as stream:
+        raw_dict = yaml.safe_load(stream)
+        
+        bn_partition = raw_dict['bn_partitions']
+        ratio_partition = raw_dict['partitions']
+        map_partition = raw_dict['maps']
+        
+        # print(ratio_partition,map_partition)
+        for name, key in ratio_partition.items():
+            # print('name:', name)
+            # print('key:', key)
+            # print(name, key)
+            # ratio_partition[name] = key[0]
+            ratio_partition[name] = key
+            # num_partition[name] = len(key[0])
+            num_partition[name] = len(key)
+
+    # else:
+    #     raise Exception("num_partition must be either a filepath or an integer")
     
     print('num_partition:', num_partition)
     print('ratio_partition:', ratio_partition)
@@ -68,6 +114,8 @@ def partition_generator(configs, model):
                                'filter_id': filter_id,
                                'channel_id': channel_id,
                                'maps': maps}
+            
+    # print('partition:', partition)
             
             # v0: split by 'jump'
             #own_state[name].copy_(param_s[i::num_partition])
@@ -141,6 +189,8 @@ def featuremap_summary(model, partition, inputs):
         return hook
     
     for name, layer in model.named_modules():
+    #     print(name)
+    #     print(layer)
         name = name+'.weight'
         if name in partition:
             layer.register_forward_hook(register_hook(name))

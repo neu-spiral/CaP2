@@ -268,8 +268,8 @@ def get_output_at_each_layer(model, input_tensor):
     # print(extractor_model) # debug
     with torch.no_grad():
         extractor_model.eval()
-        print(isinstance(input_tensor, tuple))
-        print(len(input_tensor) > 1)
+        # print(isinstance(input_tensor, tuple))
+        # print(len(input_tensor) > 1)
         horz_output = extractor_model(input_tensor)
         # horz_output = extractor_model(*input_tensor)
     
