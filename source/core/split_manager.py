@@ -23,7 +23,7 @@ console_handler = logging.StreamHandler(sys.stdout)
 
 # Set the logging level for each handler (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 file_handler.setLevel(logging.DEBUG)
-console_handler.setLevel(logging.INFO)
+console_handler.setLevel(logging.DEBUG)
 
 # Create formatters and add them to the handlers
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')

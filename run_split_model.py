@@ -23,7 +23,7 @@ console_handler = logging.StreamHandler(sys.stdout)
 
 # Set the logging level for each handler (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 file_handler.setLevel(logging.DEBUG)
-console_handler.setLevel(logging.INFO)
+console_handler.setLevel(logging.DEBUG)
 
 # Create formatters and add them to the handlers
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -119,12 +119,16 @@ def main():
 
     collected_data = [] # server fills this up 
 
+    run_split_model_start = time.time()
+    idle_time_start = time.time() 
     try:
         while True:
 
             # shut down server if machine is finished 
             if model_manager.is_done():
                 logger.info(f'Machine {model_manager.machine} has finished calculations. Shutting down...')
+                total_runtime = (time.time() - run_split_model_start)/60.0
+                logger.info(f"Total runtime={total_runtime}m")
                 for iserver in range(len(server_threads)):
                     server_threads[iserver].join()  # Wait for the server thread to finish
                 return True # end execution
@@ -134,6 +138,9 @@ def main():
 
             # check if update was made 
             if enough_input:
+                idle_time = time.time() - idle_time_start
+                logger.debug(f'Idle time={idle_time}s for layer={model_manager.current_layer}') # PLOT THIS
+
                 # grab input tensor for debugging and final check 
                 # TODO: this implementation needs to be changed to accommodate escnet where full input is multiple tensors, also doesn't work if final node does not receive model input 
                 if model_manager.current_layer == 1:
@@ -144,9 +151,10 @@ def main():
                         logger.warning('Could not find input tensor')
 
                 # execute split layers
-                logger.debug('Execute layers start layer')
+                execute_layers_start = time.time()
                 output_tensor = model_manager.execute_layers_until_comms()
-                logger.debug('Execute layers end')
+                execute_layers_time = (time.time() - execute_layers_start)*1e3
+                logger.debug(f'Executed to layer={model_manager.current_layer} in time={execute_layers_time}ms') # PLOT THIS
 
                 # always send output unless on final layer
                 if not model_manager.current_layer == model_manager.total_layers_fx:
@@ -159,6 +167,8 @@ def main():
 
                     # remove data from the queue that was processed already 
                     collected_data = [el for el in collected_data if el['layer'] != model_manager.current_layer-2]
+                logger.debug('Starting idle timer')
+                idle_time_start = time.time()
             else:
                 # continue waiting
                 collected_data = collected_data + node.collect_data_from_server(client_data_queue, 1, model_manager.current_layer)
