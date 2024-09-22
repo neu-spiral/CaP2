@@ -2,6 +2,7 @@ from source.utils import io
 
 from ..utils.misc import get_model_from_code
 from ..utils import split_network
+from ..utils.calculate_flops import calflops
 
 import torch
 import torch.nn.functional as F
@@ -13,26 +14,6 @@ import sys
 
 # Logger initialization
 logger = logging.getLogger(__name__)
-
-# Set the overall logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-logger.setLevel(logging.DEBUG)
-
-# Create handlers: one for file and one for console
-file_handler = logging.FileHandler('logfile.log')
-console_handler = logging.StreamHandler(sys.stdout)
-
-# Set the logging level for each handler (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-file_handler.setLevel(logging.DEBUG)
-console_handler.setLevel(logging.DEBUG)
-
-# Create formatters and add them to the handlers
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-console_handler.setFormatter(formatter)
-
-# Add handlers to the logger
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
 
 class SplitManager:
     """
@@ -142,7 +123,8 @@ class SplitManager:
         return self.layer_output_size_LUT[self.layer_names_fx[self.current_layer-1]]
 
     def get_current_layer_name(self):
-        return self.layer_names_fx[self.current_layer]
+        layer = min(self.current_layer, self.final_layer) # handle edge case: current layer cannot surpass final layer 
+        return self.layer_names_fx[layer]
 
     def get_layer_name(self, layer):
         return self.layer_names_fx[layer]
@@ -652,11 +634,12 @@ class SplitManager:
                 do_comms - (bool) whether or not the machine needs to communcate output 
         '''
 
+        layer_name = self.layer_names_fx[imodule]
         with torch.no_grad():
 
             # skip this machine+module if there is no input to compute 
             if not torch.is_tensor(curr_input):
-                if 'bn' in self.layer_names_fx[imodule]:
+                if 'bn' in layer_name:
                     logger.info('No input received but bn still needs to produce output.')
                     curr_input = torch.zeros(self.get_input_size(imodule), dtype=self.dtype,  device=self.device)
                 else:
@@ -668,11 +651,11 @@ class SplitManager:
             # non-comms operations 
             if imodule == self.total_layers_fx-1:
                 return self.final_output_routine(curr_input)
-            elif 'relu' in self.layer_names_fx[imodule]:
+            elif 'relu' in layer_name:
                 #logger.info('Applying ReLU')
                 return F.relu(curr_input), False
                 
-            elif 'add' in self.layer_names_fx[imodule]:
+            elif 'add' in layer_name:
                 # residual layer. No comm necessary 
                 if self.machine in self.residual_input:
                     logger.info('Adding residual')
@@ -689,19 +672,19 @@ class SplitManager:
 
                 return curr_input, False
             
-            elif 'avg_pool2d' in self.layer_names_fx[imodule]:
+            elif 'avg_pool2d' in layer_name:
                 #logger.info('Average pooling')
                 return F.avg_pool2d(curr_input, 4), False
             
-            elif 'size' in self.layer_names_fx[imodule]:
+            elif 'size' in layer_name:
                 #logger.info('Skipping')
                 return curr_input, False
             
-            elif 'view' in self.layer_names_fx[imodule]:
+            elif 'view' in layer_name:
                 #logger.info('Reshaping (view)')
                 return curr_input.view(curr_input.size(0), -1), False
                 
-            elif 'x' == self.layer_names_fx[imodule]:
+            elif 'x' == layer_name:
                 #logger.info('Model input layer.. skipping')
                 return curr_input, False
             
@@ -736,7 +719,7 @@ class SplitManager:
                     return -1, False
             else:
                 # grab from pre loaded split layers
-                split_layer = self.split_layers[self.layer_names_fx[imodule]]
+                split_layer = self.split_layers[layer_name]
             
             # eval split
             split_layer.eval()
@@ -748,6 +731,13 @@ class SplitManager:
                 tmp_out_tensor[:,input_channels.numpy(),:,:] = out_tensor
                 out_tensor = tmp_out_tensor
             
+            if self.debug:
+                # calculate FLOPS
+                curr_input_slice = curr_input.index_select(1, input_channels)
+
+                num_FLOPS, num_params = calflops.calflops(split_layer, (curr_input_slice,), do_print=False) # TODO: sanity check this makes sense 
+                logger.debug(f'FLOPS for {layer_name} layer={imodule} FLOPS={num_FLOPS} parameters={num_params}')
+
             exec_layer_name = self.get_layer_name(imodule)
             nonzero_output_channels = split_network.get_nonzero_channels(out_tensor)
             #logger.debug(f'EXECUTED: #{imodule}-{exec_layer_name}')  

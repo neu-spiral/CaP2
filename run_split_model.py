@@ -12,27 +12,10 @@ import logging
 import torch.types
 
 # Logger initialization
-logger = logging.getLogger(__name__)
+logger = logging.getLogger() # get root
 
 # Set the overall logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 logger.setLevel(logging.DEBUG)
-
-# Create handlers: one for file and one for console
-file_handler = logging.FileHandler('logfile.log')
-console_handler = logging.StreamHandler(sys.stdout)
-
-# Set the logging level for each handler (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-file_handler.setLevel(logging.DEBUG)
-console_handler.setLevel(logging.DEBUG)
-
-# Create formatters and add them to the handlers
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-console_handler.setFormatter(formatter)
-
-# Add handlers to the logger
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
 
 try:
     from source.core import split_manager, run_partition, engine
@@ -74,6 +57,35 @@ def main():
     parser.add_argument('debug', choices=['True', 'False'], default='True', help='Check each output tensor of split model')
     args = parser.parse_args()
 
+    machine_number = args.node
+    model_name = args.model_file.split('-')[1]
+    split_manager_debug = args.debug == 'True'
+
+    ## START LOGGER CONFIGURATION   
+    if split_manager_debug:
+        log_file_name = f'node{machine_number}_{model_name}_debug.log'
+    else:
+        log_file_name = f'node{machine_number}_{model_name}.log'
+
+    # Create handlers: one for file and one for console
+    file_handler = logging.FileHandler(log_file_name)
+    console_handler = logging.StreamHandler(sys.stdout)
+
+    # Set the logging level for each handler (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    file_handler.setLevel(logging.DEBUG)
+    console_handler.setLevel(logging.DEBUG)
+
+    # Create formatters and add them to the handlers
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+
+    # Add handlers to the logger
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
+    ## END LOGGER CONFIGURATION
+
     # figure out who this machine/network node receives from 
     required_clients, connection_type, num_nodes, final_node = node.load_config(args.ip_map_file, args.network_graph_file, args.node)
     logger.info(f'Starting server for node {args.node}')
@@ -97,7 +109,7 @@ def main():
         logger.warning('No dtype field found in config')
     
 
-    model_manager = split_manager.SplitManager(configs, args.node, num_nodes, input_tensor, final_node, args.debug == 'True')
+    model_manager = split_manager.SplitManager(configs, args.node, num_nodes, input_tensor, final_node, split_manager_debug)
 
     # open ip map 
     with open(args.ip_map_file, 'r') as file:
@@ -154,7 +166,8 @@ def main():
                 execute_layers_start = time.time()
                 output_tensor = model_manager.execute_layers_until_comms()
                 execute_layers_time = (time.time() - execute_layers_start)*1e3
-                logger.debug(f'Executed to layer={model_manager.current_layer} in time={execute_layers_time}ms') # PLOT THIS
+                current_layer_name = model_manager.get_current_layer_name()
+                logger.debug(f'Executed to {current_layer_name} layer={model_manager.current_layer} in time={execute_layers_time}ms') # PLOT THIS
 
                 # always send output unless on final layer
                 if not model_manager.current_layer == model_manager.total_layers_fx:
@@ -174,7 +187,7 @@ def main():
                 collected_data = collected_data + node.collect_data_from_server(client_data_queue, 1, model_manager.current_layer)
 
             # Optionally, add a sleep interval to avoid high CPU usage
-            time.sleep(5)
+            #time.sleep(5)
     except KeyboardInterrupt:
         logger.info("Shutting down...")
         for iserver in range(len(server_threads)):
