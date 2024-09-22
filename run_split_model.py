@@ -131,27 +131,30 @@ def main():
 
     collected_data = [] # server fills this up 
 
-    run_split_model_start = time.time()
-    idle_time_start = time.time() 
+    run_split_model_start = time.perf_counter()
+    idle_time_start = time.perf_counter() 
+    process_input_time = 0
     try:
         while True:
 
             # shut down server if machine is finished 
             if model_manager.is_done():
                 logger.info(f'Machine {model_manager.machine} has finished calculations. Shutting down...')
-                total_runtime = (time.time() - run_split_model_start)/60.0
+                total_runtime = (time.perf_counter() - run_split_model_start)/60.0
                 logger.info(f"Total runtime={total_runtime}m")
                 for iserver in range(len(server_threads)):
                     server_threads[iserver].join()  # Wait for the server thread to finish
                 return True # end execution
 
             # updates local tensor if enough input is present 
+            start_process_input = time.perf_counter()
             enough_input = model_manager.process_input(collected_data) 
+            process_input_time = process_input_time + (time.perf_counter() - start_process_input)*1e3
 
             # check if update was made 
             if enough_input:
-                idle_time = time.time() - idle_time_start
-                logger.debug(f'Idle time={idle_time}s for layer={model_manager.current_layer}') # PLOT THIS
+                idle_time = time.perf_counter() - idle_time_start
+                logger.debug(f'Idle time={idle_time}s process input time={process_input_time}ms for layer={model_manager.current_layer}') # PLOT THIS
 
                 # grab input tensor for debugging and final check 
                 # TODO: this implementation needs to be changed to accommodate escnet where full input is multiple tensors, also doesn't work if final node does not receive model input 
@@ -163,9 +166,9 @@ def main():
                         logger.warning('Could not find input tensor')
 
                 # execute split layers
-                execute_layers_start = time.time()
+                execute_layers_start = time.perf_counter()
                 output_tensor = model_manager.execute_layers_until_comms()
-                execute_layers_time = (time.time() - execute_layers_start)*1e3
+                execute_layers_time = (time.perf_counter() - execute_layers_start)*1e3
                 current_layer_name = model_manager.get_current_layer_name()
                 logger.debug(f'Executed to {current_layer_name} layer={model_manager.current_layer} in time={execute_layers_time}ms') # PLOT THIS
 
@@ -180,8 +183,10 @@ def main():
 
                     # remove data from the queue that was processed already 
                     collected_data = [el for el in collected_data if el['layer'] != model_manager.current_layer-2]
-                logger.debug('Starting idle timer')
-                idle_time_start = time.time()
+                
+                # start idle timer and reset process input timer
+                idle_time_start = time.perf_counter()
+                process_input_time = 0
             else:
                 # continue waiting
                 collected_data = collected_data + node.collect_data_from_server(client_data_queue, 1, model_manager.current_layer)
