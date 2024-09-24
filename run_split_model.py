@@ -53,6 +53,7 @@ def main():
     parser.add_argument('network_graph_file', type=str, help='Path to network graph JSON file')
     parser.add_argument('node', type=int, help='Node in the network to launch server for')
     parser.add_argument('model_file', type=str, help='File model file name e.g. cifar10-resnet18-kernel-npv0-pr0.75-lcm0.001.pt')
+    parser.add_argument('log_dir_name', type=str, help='Directory name that log outputs are saved to i.e. CaP/logs/[logdir name]')
     parser.add_argument('--debug', action=argparse.BooleanOptionalAction)
     parser.add_argument('debug', choices=['True', 'False'], default='True', help='Check each output tensor of split model')
     args = parser.parse_args()
@@ -61,14 +62,18 @@ def main():
     model_name = args.model_file.split('-')[1]
     split_manager_debug = args.debug == 'True'
 
-    ## START LOGGER CONFIGURATION   
+    ## START LOGGER CONFIGURATION
+
+    # setup save directory for logs 
+    log_path = os.path.join('logs', args.log_dir_name)   
+    os.makedirs(log_path, exist_ok=True) 
     if split_manager_debug:
-        log_file_name = f'node{machine_number}_{model_name}_debug.log'
+        log_file_path = os.path.join( log_path, f'node{machine_number}_{model_name}_debug.log')
     else:
-        log_file_name = f'node{machine_number}_{model_name}.log'
+        log_file_path = os.path.join( log_path, f'node{machine_number}_{model_name}.log')
 
     # Create handlers: one for file and one for console
-    file_handler = logging.FileHandler(log_file_name)
+    file_handler = logging.FileHandler(log_file_path)
     console_handler = logging.StreamHandler(sys.stdout)
 
     # Set the logging level for each handler (DEBUG, INFO, WARNING, ERROR, CRITICAL)
@@ -131,8 +136,7 @@ def main():
 
     collected_data = [] # server fills this up 
 
-    run_split_model_start = time.perf_counter()
-    idle_time_start = time.perf_counter() 
+    first_input_received = False
     process_input_time = 0
     try:
         while True:
@@ -140,8 +144,8 @@ def main():
             # shut down server if machine is finished 
             if model_manager.is_done():
                 logger.info(f'Machine {model_manager.machine} has finished calculations. Shutting down...')
-                total_runtime = (time.perf_counter() - run_split_model_start)/60.0
-                logger.info(f"Total runtime={total_runtime}m")
+                total_runtime = (time.perf_counter() - run_split_model_start)
+                logger.info(f"Total runtime={total_runtime}s")
                 for iserver in range(len(server_threads)):
                     server_threads[iserver].join()  # Wait for the server thread to finish
                 return True # end execution
@@ -153,7 +157,15 @@ def main():
 
             # check if update was made 
             if enough_input:
-                idle_time = time.perf_counter() - idle_time_start
+
+                # start counting model exectuion time when enough input is received for first layer
+                # do not count idle time waiting for input
+                if not first_input_received:
+                    run_split_model_start = time.perf_counter()
+                    idle_time = 0
+                    first_input_received = True
+                else:
+                    idle_time = time.perf_counter() - idle_time_start
                 logger.debug(f'Idle time={idle_time}s process input time={process_input_time}ms for layer={model_manager.current_layer}') # PLOT THIS
 
                 # grab input tensor for debugging and final check 
