@@ -71,6 +71,7 @@ class SplitManager:
         self.current_layer =  self.starting_layer # layer that needs to be executed (current_tensor is always the input to this layer), corresponds to index in self.layer_names_fx
         # TODO: add logic for detecting layer a machine should start at 
         self.final_layer = self.get_machine_ending_layer()
+        self.expected_comms = self.init_expected_comms()
 
         # debugging/ verification
         # layer_output_size_LUT 
@@ -394,7 +395,7 @@ class SplitManager:
         
         rx_from_nodes = np.sort(rx_from_nodes)
 
-        expected_comms = self.expected_comms_for_layer(self.machine, self.current_layer)
+        expected_comms = self.get_expected_comms()
 
         if len(expected_comms) == 0:
             logger.info(f'No comms needed to start layer {self.current_layer}')
@@ -791,6 +792,26 @@ class SplitManager:
         
         return input_channels, output_channel_map, do_comm
 
+    def init_expected_comms(self):
+        '''
+            Initializes data structure for machine to see what inputs it 
+            expects 
+        '''
+        expected_comms = {}
+        for layer in range(self.starting_layer, self.final_layer+1):
+            expected_comms_layer = self.expected_comms_for_layer(self.machine, layer)
+            layer_name = self.get_layer_name(layer)
+            expected_comms[layer_name] = expected_comms_layer
+        
+        return expected_comms
+
+
+    def get_expected_comms(self):
+        '''
+            Get an array of the nodes this machine expects to receive from 
+        '''
+        layer_name = self.get_current_layer_name()
+        return self.expected_comms[layer_name]
 
     def final_output_routine(self, input_tensor):
         '''
