@@ -161,6 +161,7 @@ def main():
                 # start counting model exectuion time when enough input is received for first layer
                 # do not count idle time waiting for input
                 if not first_input_received:
+                    logger.debug('Starting timer for total runtime')
                     run_split_model_start = time.perf_counter()
                     idle_time = 0
                     first_input_received = True
@@ -184,10 +185,11 @@ def main():
                 current_layer_name = model_manager.get_current_layer_name()
                 logger.debug(f'Executed to {current_layer_name} layer={model_manager.current_layer} in time={execute_layers_time}ms') # PLOT THIS
 
+                # TODO: add timing here
                 # always send output unless on final layer
                 if not model_manager.current_layer == model_manager.total_layers_fx:
                     # prep output
-                    processed_output = model_manager.prep_output(output_tensor) # prepare communication
+                    processed_output = model_manager.prep_output(output_tensor) # prepare communication. TODO: this probably takes awhile??
                         
                     # send data to correct node in network 
                     logger.debug('Send to nodes start')
