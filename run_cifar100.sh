@@ -6,7 +6,7 @@
 # model=resnet18
 
 dataset=cifar100
-model=wrn28_10
+model=resnet101
 
 # dataset=esc
 # model=EscFusion

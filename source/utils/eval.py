@@ -70,6 +70,7 @@ class EvalHelper():
             for batch_idx, batch in enumerate(dataloader):
                 data   = ()
                 for piece in batch[:-1]:
+                    # print(piece.shape)
                     data += (piece.float().to(device),)
                 target = batch[-1].to(device)
                 # if self.data_code == 'esc':

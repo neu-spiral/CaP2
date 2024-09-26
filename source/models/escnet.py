@@ -15,8 +15,8 @@ import numpy as np
 class BasicBlock(nn.Module):
     def __init__(self, in_planes, planes, pool_kernel=2, pool_padding=0):
         super(BasicBlock, self).__init__()
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=(3,3), padding="same", bias=False)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=(3,3), padding="same", bias=False)
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, padding="same", bias=False)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, padding="same", bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
         self.bn2 = nn.BatchNorm2d(planes)
         self.max_pool1 = nn.MaxPool2d(pool_kernel, padding=pool_padding)
@@ -34,8 +34,8 @@ class BasicBlock(nn.Module):
 class ResLike(nn.Module):
     def __init__(self, block, num_classes=10):
         super(ResLike, self).__init__()
-        self.conv1 = nn.Conv2d(15, 32, kernel_size=(7,7), padding="same", bias=False)
-        self.conv2 = nn.Conv2d(32, 32, kernel_size=(3,3), padding="same", bias=False)
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=7, padding="same", bias=False)
+        self.conv2 = nn.Conv2d(32, 32, kernel_size=3, padding="same", bias=False)
         self.layer1 = nn.Sequential(block(32, 32, pool_kernel=2))
         self.layer2 = nn.Sequential(block(32, 32, pool_kernel=2))
         # self.layer3 = nn.Sequential(block(32, 32, pool_kernel=2))
