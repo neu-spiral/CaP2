@@ -171,7 +171,7 @@ def main():
 
                 # grab input tensor for debugging and final check 
                 # TODO: this implementation needs to be changed to accommodate escnet where full input is multiple tensors, also doesn't work if final node does not receive model input 
-                if model_manager.current_layer == 1:
+                if model_manager.current_layer == 1 and model_manager.debug == True:
                     input_tensor = get_input_tensor(collected_data)
                     if torch.is_tensor(input_tensor):
                         model_manager.update_horz_output(input_tensor)
@@ -189,6 +189,7 @@ def main():
                 # always send output unless on final layer
                 if not model_manager.current_layer == model_manager.total_layers_fx:
                     # prep output
+                    start_prep_out_start = time.perf_counter()
                     processed_output = model_manager.prep_output(output_tensor) # prepare communication. TODO: this probably takes awhile??
                         
                     # send data to correct node in network 
@@ -197,7 +198,10 @@ def main():
 
                     # remove data from the queue that was processed already 
                     collected_data = [el for el in collected_data if el['layer'] != model_manager.current_layer-2]
-                
+                    prep_out_time = (time.perf_counter() - start_prep_out_start)*1e3
+                    layer_sent = model_manager.current_layer-1
+                    logger.debug(f'Prep output layer={layer_sent} time={prep_out_time}ms')
+
                 # start idle timer and reset process input timer
                 idle_time_start = time.perf_counter()
                 process_input_time = 0
