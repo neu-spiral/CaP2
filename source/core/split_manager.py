@@ -554,7 +554,7 @@ class SplitManager:
             Determine if communication is necessary after the execution of layer
             TODO: unused, remove
         '''
-        if self.layer_names_fx[layer] in ['relu', 'add', 'avg_pool2d', 'size', 'view', 'x']:
+        if self.layer_names_fx[layer] in ['relu', 'add', 'avg_pool', 'size', 'view', 'x']:
             return False
         else:
             return True
@@ -703,8 +703,8 @@ class SplitManager:
             
             elif 'avg_pool' in layer_name:
                 logger.info('Average pooling')
-                layer_path = self.layer_names_fx[imodule]
-                modules = layer_path.split('.')
+                # layer_path = self.layer_names_fx[imodule]
+                modules = layer_name.split('.')
                 layer_name = functools.reduce(getattr, modules, self.model)
                 kern = layer_name.kernel_size
                 return F.avg_pool2d(curr_input, kern), False
