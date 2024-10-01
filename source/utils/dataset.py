@@ -216,8 +216,11 @@ def get_esc_data(data_folder_path, batch_size=64):
         # ytrain += (train_label,)
         # ytest += (test_label,)
 
-    xtrain = (np.concatenate(xtrain),)
-    xtest = (np.concatenate(xtest),)
+    # xtrain = (np.concatenate(xtrain),)
+    # xtest = (np.concatenate(xtest),)
+
+
+    
     # print('xtrain shape:', xtrain[0].shape)
     # print('xtest shape:', xtest[0].shape)
 
@@ -254,9 +257,9 @@ class ESCDataLoader(object):
             x.append(torch.from_numpy(self.ds[i][index]))
         # x = torch.from_numpy(self.ds[index])
         label = self.label[index]
-        # return x[0],x[1],x[2],x[3],x[4],torch.tensor(label, dtype=torch.int8).type(torch.LongTensor)
+        return x[0],x[1],x[2],x[3],x[4],torch.tensor(label, dtype=torch.int8).type(torch.LongTensor)
         
-        return x[0],torch.tensor(label, dtype=torch.int8).type(torch.LongTensor)
+        # return x[0],torch.tensor(label, dtype=torch.int8).type(torch.LongTensor)
 
     def __len__(self):
         return len(self.ds[0])  # assume both datasets have same length

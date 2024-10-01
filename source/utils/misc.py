@@ -54,8 +54,8 @@ def get_input_from_code(configs):
                        (360, 640, 3),
                        (20, 20, 20),]
     elif configs['data_code'] == 'esc':
-        # input_shape = [(15, 266, 320)]
-        input_shape = [(3, 266, 320)]
+        input_shape = [(15, 266, 320)]
+        # input_shape = [(3, 266, 320)]
         # input_shape = [(3, 266, 320) for _ in range(5)]
     else:
         input_shape = [(3, 32, 32)]
