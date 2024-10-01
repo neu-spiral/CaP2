@@ -11,7 +11,7 @@ learning_rate: 0.01
 seed: 1234
 
 sparsity_type: kernel
-prune_ratio: 0.75
+prune_ratio: 0.8
 admm: True
 admm_epochs: 300
 rho: 0.01
@@ -38,7 +38,7 @@ bn_type: regular
 
 par_first_layer: True
 comm_outsize: True
-lambda_comm: 10
+lambda_comm: 1000
 lambda_comp: 0
 create_partition: False
 load_model: True
