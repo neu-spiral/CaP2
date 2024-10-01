@@ -71,7 +71,8 @@ class SplitManager:
         self.current_layer =  self.starting_layer # layer that needs to be executed (current_tensor is always the input to this layer), corresponds to index in self.layer_names_fx
         # TODO: add logic for detecting layer a machine should start at 
         self.final_layer = self.get_machine_ending_layer()
-        self.expected_comms = self.init_expected_comms()
+        self.expected_rx = self.init_expected_rx()
+        self.expected_tx = self.init_expected_tx()
 
         # debugging/ verification
         # layer_output_size_LUT 
@@ -333,7 +334,7 @@ class SplitManager:
             #logger.debug(f'Skipping check for output {output_layer_name} (no tensor found for ref.) ')
             return 1
 
-    def expected_comms_for_layer(self, network_node, layer):
+    def expected_rx_for_layer(self, network_node, layer):
         '''
             Determine which nodes this network_node needs to wait on for the execution of layer. Expects to be called 
             on layers directly after convolutional layers.
@@ -388,31 +389,45 @@ class SplitManager:
                 0 == received too few inputs 
         '''
 
+        # handle no required input OR wait for the start signal 
+        look_for_start = False
+        expected_rx = self.get_expected_rx()
+        N_expected = len(expected_rx)
+        if N_expected == 0:
+            if not self.current_layer == self.starting_layer:
+                # wait for starting signal 
+                logger.info(f'No comms needed to start layer {self.current_layer}.')
+                return 1
+            else:
+                look_for_start = True
+
         rx_from_nodes = np.array([])
         for data in collected_data:
             if data['layer'] == self.current_layer-1:
                 rx_from_nodes = np.append(rx_from_nodes, data['node'])
+            elif look_for_start and 'start' in data:
+                logger.debug(f'Got starting queue for layer {self.current_layer}')
+                return 1
+
         
         rx_from_nodes = np.sort(rx_from_nodes)
-
-        expected_comms = self.get_expected_comms()
-
-        if len(expected_comms) == 0:
-            logger.info(f'No comms needed to start layer {self.current_layer}')
-            return 1
-        elif len(rx_from_nodes) < len(expected_comms):
+        
+        if  N_expected == 0:
+            logger.debug(f'Waiting for starting queue for layer={self.current_layer}')
+            return 0
+        if len(rx_from_nodes) < len(expected_rx):
             logger.info(f'Too few inputs for layer={self.current_layer}')
             logger.debug(f'\t\t Collected inputs from nodes: {rx_from_nodes}')
-            logger.debug(f'\t\t Need inputs from nodes: {expected_comms}')
+            logger.debug(f'\t\t Need inputs from nodes: {expected_rx}')
             return 0
-        elif len(rx_from_nodes) > len(expected_comms):
+        elif len(rx_from_nodes) > len(expected_rx):
             logger.warning(f'Too many inputs for layer={self.current_layer}')
             return 2
-        elif np.all(rx_from_nodes == expected_comms):
+        elif np.all(rx_from_nodes == expected_rx):
             return 1
         else:
             logger.warning(f'Received unexpected inputs for layer={self.current_layer}')
-            return 1
+            return 0
 
     def prep_output(self, out_tensor):
         ''' 
@@ -447,11 +462,8 @@ class SplitManager:
         # prep communications by populating output
         out_channel_array = torch.arange(out_tensor.shape[1]) 
         all_output = []
-        for rx_mach in range(self.N_machines): # TODO: change implementation to only consider parent nodes
-            
-            # only send message if rx_mach expects communication from this machine
-            if not (self.machine in self.expected_comms_for_layer(rx_mach, self.current_layer)):
-                continue
+        output_layer_name = self.get_layer_name(self.current_layer-1)
+        for rx_mach in self.expected_tx[output_layer_name]: # TODO: change implementation to only consider parent nodes
 
             # init output dict
             output_element = {}
@@ -467,16 +479,13 @@ class SplitManager:
             if nonzero_out_channels.nelement() > 0:
                 output_element['is_empty'] =False
 
+                # send info about subset of tensor sent
                 communication_out_mask = out_channel_array[torch.isin(out_channel_array, nonzero_out_channels)]
-                communication_out_channels = out_channel_array[communication_out_mask]
                 output_element['Cin'] = communication_out_mask.tolist()
 
-                # TODO: this is inefficient, redo. Probbably need to send a tensor and some info what output channels are being sent 
+                # send subset of tensor
                 output_element['tensor'] = out_tensor[:,communication_out_mask,]
 
-                curr_layer_name = self.get_current_layer_name()
-                #logger.debug(f'Machine={self.machine}, Layer to execute = {self.current_layer}:{curr_layer_name}.')
-                #logger.debug(f'Prepping to send C_out {communication_out_channels} to machine {rx_mach}')
             else:
                 output_element['is_empty'] =True
 
@@ -515,9 +524,9 @@ class SplitManager:
 
             # TODO: update this to be dynamic
             if self.current_layer == 1:
-                N_expected_comms = 1
+                N_expected_rx = 1
             else:
-                N_expected_comms = self.N_machines-1 
+                N_expected_rx = self.N_machines-1 
 
             count = 0
             with torch.no_grad():
@@ -792,26 +801,58 @@ class SplitManager:
         
         return input_channels, output_channel_map, do_comm
 
-    def init_expected_comms(self):
+    def init_expected_rx(self):
         '''
             Initializes data structure for machine to see what inputs it 
             expects 
         '''
-        expected_comms = {}
+        expected_rx = {}
         for layer in range(self.starting_layer, self.final_layer+1):
-            expected_comms_layer = self.expected_comms_for_layer(self.machine, layer)
+            expected_rx_layer = self.expected_rx_for_layer(self.machine, layer)
             layer_name = self.get_layer_name(layer)
-            expected_comms[layer_name] = expected_comms_layer
+            expected_rx[layer_name] = expected_rx_layer
         
-        return expected_comms
+        return expected_rx
+
+    def init_expected_tx(self):
+        '''
+            Initializes data structure for machine to know where to send outputs
+            TODO: isnt necessary but probably nice to remove non-communication layers
+        
+            Output:
+                expected_tx - (dict) lookup for each layer on where split output should be sent
+                    keys - (str) layer name of split output
+                    values - (np array) nodes that need output from corresponding layer 
+        '''
+        
+        # iterate through layers assigned to this machine
+        expected_tx = {}
+        for layer in range(self.starting_layer, min(self.final_layer+2, self.total_layers_fx)): # include final layer the machine computes and look at the input for the next layer
+            
+            # check every other node in the network if it receives from current node
+            tx_to_nodes = []
+            for imach in range(self.N_machines):
+                # skip if sending to own machine
+                if imach == self.machine:
+                    continue
+                
+                # if imach receives from current node, add to tx list 
+                if self.machine in self.expected_rx_for_layer(imach, layer):
+                    tx_to_nodes.append(imach)
+
+            layer_name = self.get_layer_name(layer-1) # rx nodes expect to rx outputs from previous layer
+            expected_tx[layer_name] = tx_to_nodes
+            
+        return expected_tx
 
 
-    def get_expected_comms(self):
+
+    def get_expected_rx(self):
         '''
             Get an array of the nodes this machine expects to receive from 
         '''
         layer_name = self.get_current_layer_name()
-        return self.expected_comms[layer_name]
+        return self.expected_rx[layer_name]
 
     def final_output_routine(self, input_tensor):
         '''
@@ -878,6 +919,7 @@ class SplitManager:
                 split_layers[curr_layer_name] = torch.load(layer_path, map_location=self.device).eval()
 
         return split_layers
+
 
 
             

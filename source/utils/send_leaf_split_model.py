@@ -28,12 +28,17 @@ def main():
         config = json.load(f)
 
     servers = [(srv['ip'], srv['port']) for srv in config['servers']]
+    send_data = [srv['data'] == 'True' for srv in config['servers']]
 
     tensor = torch.rand((1,3,32,32)) # single image from cifar 
 
     # 3 send each server different data 
     for iserver in range(len(servers)):
-        processed_data = prep_data(tensor)
+
+        if send_data[iserver]:
+           processed_data = prep_data(tensor)
+        else:
+            processed_data = {"start": 1, 'layer':0, 'node':-1}
 
         print(f'Sending data to {servers[iserver]}')
         leaf.send_to_servers(processed_data,[servers[iserver]])     

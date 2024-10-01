@@ -99,6 +99,7 @@ def main():
     # make split manager for executing split execution 
     # TODO: generalize 
     configs = split_network.config_setup_resnet(num_nodes, args.model_file)
+
     # file path for split layers
     configs['split_layers_path'] = os.path.join('assets','models',f'vsplit-{args.model_file[:-3]}', f'machine-{args.node}')
 
@@ -166,8 +167,8 @@ def main():
                     idle_time = 0
                     first_input_received = True
                 else:
-                    idle_time = time.perf_counter() - idle_time_start
-                logger.debug(f'Idle time={idle_time}s process input time={process_input_time}ms for layer={model_manager.current_layer}') # PLOT THIS
+                    idle_time = (time.perf_counter() - idle_time_start)*1e3
+                logger.debug(f'Idle time={idle_time}ms process input time={process_input_time}ms for layer={model_manager.current_layer-1}') # PLOT THIS
 
                 # grab input tensor for debugging and final check 
                 # TODO: this implementation needs to be changed to accommodate escnet where full input is multiple tensors, also doesn't work if final node does not receive model input 
@@ -182,8 +183,8 @@ def main():
                 execute_layers_start = time.perf_counter()
                 output_tensor = model_manager.execute_layers_until_comms()
                 execute_layers_time = (time.perf_counter() - execute_layers_start)*1e3
-                current_layer_name = model_manager.get_current_layer_name()
-                logger.debug(f'Executed to {current_layer_name} layer={model_manager.current_layer} in time={execute_layers_time}ms') # PLOT THIS
+                prev_layer_name = model_manager.get_layer_name(model_manager.current_layer-1)
+                logger.debug(f'Executed to {prev_layer_name} layer={model_manager.current_layer-1} in time={execute_layers_time}ms') # PLOT THIS
 
                 # TODO: add timing here
                 # always send output unless on final layer
