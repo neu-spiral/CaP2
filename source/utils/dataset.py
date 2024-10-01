@@ -196,30 +196,53 @@ def get_esc_data(data_folder_path, batch_size=64):
             test_input = test_input + paths_test
 
             if selection == 'Radar':
-                train_label = np.concatenate((train_label, np.ones(len(paths_train))))
-                test_label = np.concatenate((test_label, np.ones(len(paths_test))))
+                train_label = np.concatenate((train_label, np.ones(len(paths_train), dtype=int)))
+                test_label = np.concatenate((test_label, np.ones(len(paths_test), dtype=int)))
             else:
-                train_label = np.concatenate((train_label, np.zeros(len(paths_train))))
-                test_label = np.concatenate((test_label, np.zeros(len(paths_test))))
+                train_label = np.concatenate((train_label, np.zeros(len(paths_train), dtype=int)))
+                test_label = np.concatenate((test_label, np.zeros(len(paths_test), dtype=int)))
 
         xtrain += (fetch_esc_data(train_input),)
         xtest += (fetch_esc_data(test_input),)
 
+        # xtrain = np.concatenate((xtrain, fetch_esc_data(train_input)))
+        # xtest = np.concatenate((xtest, fetch_esc_data(test_input)))
+
+        # print('xtrain shape:', len(xtrain[0]))
+        # print(xtrain)
+
         ytrain = np.concatenate((ytrain, train_label))
         ytest = np.concatenate((ytest, test_label))
+        # ytrain += (train_label,)
+        # ytest += (test_label,)
+
+    # xtrain = (np.concatenate(xtrain),)
+    # xtest = (np.concatenate(xtest),)
+
+
+    
+    # print('xtrain shape:', xtrain[0].shape)
+    # print('xtest shape:', xtest[0].shape)
+
+    # print('ytrain shape:', ytrain.shape)
+    # print('ytest shape:', ytest.shape)
 
     # for i in tqdm(range(len(data_train)-1)):
     #     xtrain += (fetch_esc_data(data_train[i]),)
     #     xtest += (fetch_esc_data(data_test[i]),)
-    
+
     params = {'batch_size': batch_size,
               'shuffle': True,
               'num_workers': 0,}
     
     training_set = ESCDataLoader(*xtrain, label=ytrain)
+    # training_set = ESCDataLoader(xtrain, label=ytrain)
+    # print('training_set',training_set)
+    # print(training_set.__len__())
     train_loader = torch.utils.data.DataLoader(training_set, **params)
     
     testing_set = ESCDataLoader(*xtest, label=ytest)
+    # testing_set = ESCDataLoader(xtest, label=ytest)
     test_loader = torch.utils.data.DataLoader(testing_set, **params)
     return train_loader, test_loader
 
@@ -232,8 +255,11 @@ class ESCDataLoader(object):
         x = []
         for i, ds in enumerate(self.ds):
             x.append(torch.from_numpy(self.ds[i][index]))
+        # x = torch.from_numpy(self.ds[index])
         label = self.label[index]
         return x[0],x[1],x[2],x[3],x[4],torch.tensor(label, dtype=torch.int8).type(torch.LongTensor)
+        
+        # return x[0],torch.tensor(label, dtype=torch.int8).type(torch.LongTensor)
 
     def __len__(self):
         return len(self.ds[0])  # assume both datasets have same length
@@ -242,10 +268,14 @@ def fetch_esc_data(data):
     x = []
     for image_path in data:
         image = Image.open(image_path) #(677,532,3)
+        # print('image',image.size)
         image = np.asarray(image.resize((320,266)))
+        # print('image',image.shape)
         
-        image = image/255.
+        # image = image/255.
+        # print('image',image.shape)
         image = np.moveaxis(image, -1, 0)
+        # print('image',image.shape)
         #dimensions = self.args.input_dims   #(512,512)
         #image = cv2.resize(image, dimensions)
         x.append(image)

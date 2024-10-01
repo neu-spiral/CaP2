@@ -70,12 +70,25 @@ class EvalHelper():
             for batch_idx, batch in enumerate(dataloader):
                 data   = ()
                 for piece in batch[:-1]:
+                    # print(piece.shape)
                     data += (piece.float().to(device),)
                 target = batch[-1].to(device)
+                # if self.data_code == 'esc':
+                #     target = target.unsqueeze(1).float()
+
+                # Concatenate the input data, it is tuple of tensors
+                data = (torch.cat(data, dim=1),)
+
 
                 # compute output
                 output = model(*data)
+                # print(output.shape, target.shape)
+                # print(output, target)
                 loss = criterion(output, target)
+
+                # probabilities = torch.softmax(output, dim=1)
+                # print(probabilities)
+                # print(loss)
 
                 # measure accuracy and record loss
                 acc1 = self.call(output, target)
@@ -93,6 +106,7 @@ class EvalHelper():
         
         if self.data_code == 'esc':
             auc = roc_auc_score(target_all, output_all[:, 1])
+            # auc = roc_auc_score(target_all, output_all.squeeze())
             prec, recall, fscore, _ = precision_recall_fscore_support(target_all, np.argmax(output_all, axis=1), average='macro')
             print("prec: {:.4f}, recall: {:.4f}, auc: {:.4f}".format(prec, recall, auc))
         

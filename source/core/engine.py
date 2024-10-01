@@ -34,8 +34,8 @@ class MoP:
         self.model = get_model_from_code(configs).to(self.device)
         
         # Load pretrained weights
-        if 'load_model' in configs:
-            state_dict = torch.load(get_model_path("{}".format(configs["load_model"])), map_location=self.device)
+        if configs["load_model"]:
+            state_dict = torch.load(get_model_path("{}".format(configs["load_model_file"])), map_location=self.device)
             self.model = load_state_dict(self.model, 
                                          state_dict['model_state_dict'] if 'model_state_dict' in state_dict 
                                          else state_dict['state_dict'] if 'state_dict' in state_dict else state_dict,)
@@ -63,27 +63,32 @@ class MoP:
         
         # Get input shape from data_code
         self.input_var = get_input_from_code(configs)
-        
-        # Config partitions and prune_ratio
-        self.configs = partition_generator(configs, self.model)
+
+        if configs['create_partition']:
+            # Create partition and save to yaml file
+            create_partition(configs, self.model)
+        else:
+            # Config partitions and prune_ratio
+            self.configs = partition_generator(configs, self.model)
+                
+            # Compute output size of each layer
+            self.configs['partition'] = featuremap_summary(self.model, self.configs['partition'], self.input_var)
             
-        # Compute output size of each layer
-        self.configs['partition'] = featuremap_summary(self.model, self.configs['partition'], self.input_var)
-        
-        # Setup communication costs
-        self.configs['comm_costs'] = set_communication_cost(self.model, self.configs['partition'],)
-        
-        # Calculate flops
-        calflops(self.model, self.input_var)
-        
-        # Test before prune
-        test_partition(self.model, partition=self.configs['partition'])
-        
-        # Plot model
-        layer_id = (2,6,11,15)
-        layer_id = (2,4)
-        plot_layer(self.model, self.configs['partition'], layer_id=layer_id,
-                   savepath=get_fig_path("{}".format('.'.join(configs["load_model"].split('.')[:-1]))))
+            # Setup communication costs
+            self.configs['comm_costs'] = set_communication_cost(self.model, self.configs['partition'],)
+            # print('Communication cost is set', self.configs['comm_costs'])
+            
+            # Calculate flops
+            calflops(self.model, self.input_var)
+            
+            # Test before prune
+            test_partition(self.model, partition=self.configs['partition'])
+            
+            # Plot model
+            # layer_id = (2,6,11,15)
+            # layer_id = (2,4)
+            # plot_layer(self.model, self.configs['partition'], layer_id=layer_id,
+            #            savepath=get_fig_path("{}".format('.'.join(configs["load_model_file"].split('.')[:-1]))))
             
     def prune(self):
         nepoch = self.configs['epochs']
@@ -224,7 +229,7 @@ class MoP:
                 best = acc
                 # save_model(self.model, get_model_path("{}".format(self.model_file.split('.')[0]+'.pt')))
                 format_name = self.model_file.split('-')
-                save_model(self.model, get_model_path("{}".format('-'.join(format_name[:4])+'.pt')))
+                save_model(self.model, get_model_path("{}".format('-'.join(format_name[:2])+'.pt')))
                 print('Save model')
                 
     def test_model(self, model, criterion, cepoch=0):

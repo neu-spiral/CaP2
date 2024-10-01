@@ -30,19 +30,28 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
         total_loss = 0
         comm_loss = 0
         comp_loss = 0
+
+        data = (torch.cat(data, dim=1),)
         
         optimizer.zero_grad()
         
         if configs['mix_up']:
             data, target_a, target_b, lam = mixup_data(*data, y=target, alpha=configs['alpha'])
+        # print('data:', data)
         
+        # print(len(data))
+        # print(data[0].shape)
         output = model(*data)
+        # print('output:', output)
         
         if configs['mix_up']:
             loss = mixup_criterion(criterion, output, target_a, target_b, lam, configs['smooth'])
         else:
             loss = criterion(output, target, smooth=configs['smooth'])
+            # loss = criterion(output, target.unsqueeze(1).float())
+        # print('xentropy_loss:', loss)
         total_loss += (loss * configs['xentropy_weight'])
+        # print('total_loss:', total_loss)
         
         if ADMM is not None:
             z_u_update(configs, ADMM, model, cepoch, batch_idx)  # update Z and U variables
@@ -82,6 +91,7 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
                         comp_loss = max(comp_loss, torch.abs(W).view(W.size(0), -1)[partition[name]['filter_id'][i],:].sum())
                     '''
             total_loss += configs['lambda_comm'] * comm_loss + configs['lambda_comp'] * comp_loss
+            # print('total_loss:', total_loss)
         
         total_loss.backward() # Back Propagation
         

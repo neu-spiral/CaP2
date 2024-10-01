@@ -54,12 +54,15 @@ def get_input_from_code(configs):
                        (360, 640, 3),
                        (20, 20, 20),]
     elif configs['data_code'] == 'esc':
-        input_shape = [(3, 266, 320) for _ in range(5)]
+        input_shape = [(15, 266, 320)]
+        # input_shape = [(3, 266, 320)]
+        # input_shape = [(3, 266, 320) for _ in range(5)]
     else:
         input_shape = [(3, 32, 32)]
     
     input_np = (np.random.uniform(0, 1, (2,)+x) for x in input_shape)
     input_var = tuple(Variable(torch.FloatTensor(x), requires_grad=False).to(device) for x in input_np)
+    # input_var = torch.cat(input_var, dim=1)
     return input_var
     
 def get_layers(layer_type):
@@ -94,7 +97,8 @@ def set_optimizer(configs, model, train_loader, opt, lr, epochs):
 
     # criterion
     if configs['data_code'] == 'esc':
-        #criterion = nn.BCEWithLogitsLoss()
+        # criterion = nn.BCEWithLogitsLoss().to(configs['device'])
+        # criterion = nn.BCELoss().to(configs['device'])
         criterion = CrossEntropyLossMaybeSmooth(smooth_eps=configs['smooth_eps']).to(configs['device'])
     else:
         criterion = CrossEntropyLossMaybeSmooth(smooth_eps=configs['smooth_eps']).to(configs['device'])
