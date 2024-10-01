@@ -3,48 +3,28 @@
         {
             "ip": "127.0.0.1",
             "port": 5000,
-            "connection_from": "bs"
-        },
-        {
-            "ip": "127.0.0.1",
-            "port": 5004,
-            "connection_from": "ue"
+            "connection_from": "server"
         }
     ],
     "1": [
         {
             "ip": "127.0.0.1",
             "port": 5001,
-            "connection_from": "bs"
-        },
-        {
-            "ip": "127.0.0.1",
-            "port": 5005,
-            "connection_from": "ue"
+            "connection_from": "server"
         }
     ],
     "2": [
         {
             "ip": "127.0.0.1",
             "port": 5002,
-            "connection_from": "bs"
-        },
-        {
-            "ip": "127.0.0.1",
-            "port": 5006,
-            "connection_from": "ue"
+            "connection_from": "server"
         }
     ],
     "3": [
         {
             "ip": "127.0.0.1",
             "port": 5003,
-            "connection_from": "bs"
-        },
-        {
-            "ip": "127.0.0.1",
-            "port": 5007,
-            "connection_from": "ue"
+            "connection_from": "server"
         }
     ]
 }

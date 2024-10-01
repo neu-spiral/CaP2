@@ -4,19 +4,29 @@
             "node": 1,
             "ip": "127.0.0.1",
             "port": 5001,
-            "connection_from": "bs"
+            "connection_from": "server", 
+            "data": "True"
         }, 
         {
             "node" : 2,
             "ip": "127.0.0.1",
             "port": 5002,
-            "connection_from": "bs"
+            "connection_from": "server",
+            "data": "True"
         }, 
         {
             "node" : 3,
             "ip": "127.0.0.1",
             "port": 5003,
-            "connection_from": "bs"
+            "connection_from": "server",
+            "data": "True"
+        }, 
+        {
+            "node": 0,
+            "ip": "127.0.0.1",
+            "port": 5000,
+            "connection_from": "server", 
+            "data": "False"
         }
     ]
 }
