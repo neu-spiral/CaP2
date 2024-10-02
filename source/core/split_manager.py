@@ -951,7 +951,7 @@ class SplitManager:
 
             # is final layer
             is_final_layer = self.total_layers_fx-1 == layer
-            is_operation = any([ el in curr_layer_name for el in ['relu', 'add', 'avg_pool2d', 'size', 'view', 'x'] ])
+            is_operation = any([ el in curr_layer_name for el in ['relu', 'add', 'avg_pool', 'max_pool', 'dropout', 'size', 'view', 'x'] ])
             if not (is_final_layer or is_operation):
                 # get layer from full module
                 curr_layer = split_network.get_current_module(self.model, layer)
@@ -985,7 +985,7 @@ class SplitManager:
             curr_layer_name = self.layer_names_fx[layer]
             
             is_final_layer = self.total_layers_fx-1 == layer
-            is_operation = any([ el in curr_layer_name for el in ['relu', 'add', 'avg_pool2d', 'size', 'view', 'x'] ])
+            is_operation = any([ el in curr_layer_name for el in ['relu', 'add', 'avg_pool', 'max_pool', 'dropout', 'size', 'view', 'x'] ])
 
             # assign to  struct if split layer
             if not (is_final_layer or is_operation):
