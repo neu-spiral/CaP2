@@ -11,7 +11,7 @@ learning_rate: 0.01
 seed: 1234
 
 sparsity_type: kernel
-prune_ratio: 0.7
+prune_ratio: 0.8
 admm: True
 admm_epochs: 300
 rho: 0.0001

@@ -1,4 +1,4 @@
-device: cuda:1
+device: cuda:0
 model: EscFusion
 data_code: esc
 num_classes: 2
@@ -11,7 +11,7 @@ learning_rate: 0.01
 seed: 1234
 
 sparsity_type: kernel
-prune_ratio: 0.8
+prune_ratio: 0.85
 admm: True
 admm_epochs: 300
 rho: 0.01
