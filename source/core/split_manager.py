@@ -323,7 +323,7 @@ class SplitManager:
             max_diff, max_by_Cout, print_str = SplitManager.compare_helper(self.current_tensor[:,input_channels,], truth_output[:,input_channels,])
             #logger.debug('\n\n')
 
-            if max_diff > limit or is_final_layer:
+            if torch.any(max_diff > limit) or is_final_layer:
                 logger.error('ERROR:')
                 logger.error(print_str)
                 return 0
