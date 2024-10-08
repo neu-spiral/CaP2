@@ -72,10 +72,13 @@ def get_current_module(model, imodule):
     layer_names_fx =  get_graph_node_names(model)[1]
     layer_name = layer_names_fx[imodule]
 
-    if layer_name == 'x':
+    if layer_name == 'x' or layer_name == '_x':
+    # if layer_name == 'x' or layer_name == '_x' or layer_name == 'getitem' or layer_name == 'getitem_1' or layer_name == 'getitem_2' or layer_name == 'getitem_3' or layer_name == 'getitem_4' or layer_name == 'cat':
         return model 
     else:
         tmp = model
+        if '_' in layer_name:
+            layer_name = layer_name.split('_')[0]
         layer_name_split = layer_name.split('.')
         for lname in layer_name_split:
             if lname.isdigit():
@@ -103,6 +106,7 @@ def get_layer_output(model, input_tensor, imodule):
     with torch.no_grad():
         extractor_model.eval()
         intermediate_out = extractor_model(input_tensor)
+        # intermediate_out = extractor_model(*input_tensor)
         return intermediate_out[f'layer_{imodule}']
 
 def split_conv_layer(module_full, input_channels):
@@ -161,6 +165,8 @@ def split_linear_layer(module_full, input_channels):
     
     '''
     N_in = len(input_channels)
+    # print(f'N_in = {N_in}')
+    # print(f'N_out = {module_full.weight.shape[0]}')
     split_layer = nn.Linear(N_in, 
         module_full.weight.shape[0], 
         bias=False)
@@ -185,8 +191,10 @@ def get_residual_block_indexes(model):
     layer_names = get_graph_node_names(model)[1]
     
     block_num = '-1'
+    large_block_num = '-1'
     imodule = 0
     for name in layer_names:
+        # print(name)
 
         # unpack layer name
         tmp = name.split('.')
@@ -194,19 +202,24 @@ def get_residual_block_indexes(model):
            # assume belongs to no large layer block e.g. start of the model 
            tmp_layer_type = tmp[0]
            tmp_block_num = '-1'
+           tmp_large_layer = '-1'
         else:
             # unpack 
             tmp_large_layer = tmp[0]
             tmp_block_num = tmp[1]
             tmp_layer_type = tmp[2]
+
+        # print(f'block_num = {tmp_block_num}')
         
         # detect when a new block is entered and save the index 
-        if not (tmp_block_num == block_num):
+        if not (tmp_block_num == block_num) or not (tmp_large_layer == large_block_num):
             block_num = tmp_block_num
+            large_block_num = tmp_large_layer
             residual_block_start = np.append(residual_block_start, imodule)
 
         # detect first shortcut layer
         if 'shortcut.0' in name:
+            # print(f'found shortcut at {imodule}')
             residual_connection_start = np.append(residual_connection_start, imodule)
 
         # detect residual summing 
@@ -219,7 +232,7 @@ def get_residual_block_indexes(model):
 def get_nonzero_channels(atensor, dim=1):
     return torch.unique(torch.nonzero(atensor, as_tuple=True)[dim]) 
 
-def  compare_tensors(t1, t2, dim=1, rshape=(1,64,-1)):
+def compare_tensors(t1, t2, dim=1, rshape=(1,64,-1)):
     diff = torch.abs(t1-t2)
 
     max_diff_pin_dim = torch.max(diff.reshape(rshape), dim)
@@ -237,9 +250,13 @@ def get_output_at_each_layer(model, input_tensor):
         get_horz_out[aname] = aname
 
     extractor_model = create_feature_extractor(model,return_nodes = get_horz_out)
+    # print(extractor_model) # debug
     with torch.no_grad():
         extractor_model.eval()
+        # print(isinstance(input_tensor, tuple))
+        # print(len(input_tensor) > 1)
         horz_output = extractor_model(input_tensor)
+        # horz_output = extractor_model(*input_tensor)
     
     size_LUT = {}
     index = 0

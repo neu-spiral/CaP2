@@ -66,6 +66,10 @@ def get_model_path(filename, idx=None):
     filepath = os.path.join(os.getcwd(), 'assets', 'models', filename)
     return filepath
 
+def get_model_path_split(filename, idx=None):
+    filepath = os.path.join(os.getcwd(), 'assets', 'models', 'perm', filename)
+    return filepath
+
 def get_fig_path(filename, idx=None):
     filepath = os.path.join(os.getcwd(),'assets','figs', filename)
     return filepath

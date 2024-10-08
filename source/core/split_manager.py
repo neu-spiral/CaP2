@@ -15,6 +15,9 @@ import sys
 # Logger initialization
 logger = logging.getLogger(__name__)
 
+import functools
+import operator
+
 class SplitManager:
     """
     Each thread runs a SplitManager object to handle I/O for its portion of the vertically split model 
@@ -49,7 +52,7 @@ class SplitManager:
 
         # load model TODO: only load what is necessary for this thread
         model = get_model_from_code(configs).to(configs['device']) # grabs model architecture from ./source/models/escnet.py
-        state_dict = torch.load(io.get_model_path("{}".format(configs["load_model"])), map_location=configs['device'])
+        state_dict = torch.load(io.get_model_path_split("{}".format(configs["load_model"])), map_location=configs['device'])
         self.model = io.load_state_dict(model, 
                     state_dict['model_state_dict'] if 'model_state_dict' in state_dict 
                     else state_dict['state_dict'] if 'state_dict' in state_dict else state_dict,)
@@ -539,7 +542,7 @@ class SplitManager:
             Determine if communication is necessary after the execution of layer
             TODO: unused, remove
         '''
-        if self.layer_names_fx[layer] in ['relu', 'add', 'avg_pool2d', 'size', 'view', 'x']:
+        if self.layer_names_fx[layer] in ['relu', 'add', 'avg_pool', 'size', 'view', 'x']:
             return False
         else:
             return True
@@ -636,6 +639,7 @@ class SplitManager:
         with torch.no_grad():
 
             # skip this machine+module if there is no input to compute 
+            # print('curr input shape:', len(curr_input))
             if not torch.is_tensor(curr_input):
                 if 'bn' in layer_name:
                     logger.info('No input received but bn still needs to produce output.')
@@ -652,6 +656,11 @@ class SplitManager:
             elif 'relu' in layer_name:
                 #logger.info('Applying ReLU')
                 return F.relu(curr_input), False
+            
+            elif 'dropout' in self.layer_names_fx[imodule]:
+                # just dropout no comm necessary 
+                print('\t\t-Applying Dropout')
+                return F.dropout(curr_input, p=0.3, training=True), False
                 
             elif 'add' in layer_name:
                 # residual layer. No comm necessary 
@@ -670,9 +679,50 @@ class SplitManager:
 
                 return curr_input, False
             
-            elif 'avg_pool2d' in layer_name:
-                #logger.info('Average pooling')
-                return F.avg_pool2d(curr_input, 4), False
+            # elif 'avg_pool1' in self.layer_names_fx[imodule]:
+            #     print('\t\t-average pooling')
+            #     kern = self.model.avg_pool1.kernel_size
+            #     return F.avg_pool2d(curr_input, kern), False
+            
+            # elif 'avg_pool2' in self.layer_names_fx[imodule]:
+            #     print('\t\t-average pooling')
+            #     kern = self.model.avg_pool2.kernel_size
+            #     return F.avg_pool2d(curr_input, kern), False
+            
+            elif 'avg_pool' in layer_name:
+                logger.info('Average pooling')
+                # layer_path = self.layer_names_fx[imodule]
+                modules = layer_name.split('.')
+                layer_name = functools.reduce(getattr, modules, self.model)
+                kern = layer_name.kernel_size
+                return F.avg_pool2d(curr_input, kern), False
+            
+            # elif 'max_pool1' in self.layer_names_fx[imodule]:
+            #     print(self.layer_names_fx[imodule])
+            #     print('\t\t-max pooling')
+            #     kern = self.model.self.layer_names_fx[imodule].kernel_size
+            #     return F.max_pool2d(curr_input, kern), False
+            
+            # elif 'max_pool2' in self.layer_names_fx[imodule]:
+            #     print('\t\t-max pooling')
+            #     kern = self.model.max_pool2.kernel_size
+            #     return F.max_pool2d(curr_input, kern), False
+            
+            elif 'max_pool' in self.layer_names_fx[imodule]:
+                logger.info('Max pooling')
+                layer_path = self.layer_names_fx[imodule]
+                modules = layer_path.split('.')
+                layer_name = functools.reduce(getattr, modules, self.model)
+                kern = layer_name.kernel_size
+                return F.max_pool2d(curr_input, kern), False
+            
+            # elif 'pool2' in self.layer_names_fx[imodule]:
+            #     print('\t\t-average pooling')
+            #     return F.avg_pool2d(curr_input, 2), False
+            
+            # elif 'pool' in self.layer_names_fx[imodule]:
+            #     print('\t\t-max pooling')
+            #     return F.max_pool2d(curr_input, 2), False
             
             elif 'size' in layer_name:
                 #logger.info('Skipping')
@@ -681,6 +731,30 @@ class SplitManager:
             elif 'view' in layer_name:
                 #logger.info('Reshaping (view)')
                 return curr_input.view(curr_input.size(0), -1), False
+            
+            # elif 'getitem' in self.layer_names_fx[imodule]:
+            #     print('\t\t-getitem')
+            #     return curr_input[0], False
+            
+            # elif 'getitem_1' in self.layer_names_fx[imodule]:
+            #     print('\t\t-getitem_1')
+            #     return curr_input[1], False
+            
+            # elif 'getitem_2' in self.layer_names_fx[imodule]:
+            #     print('\t\t-getitem_2')
+            #     return curr_input[2], False
+            
+            # elif 'getitem_3' in self.layer_names_fx[imodule]:
+            #     print('\t\t-getitem_3')
+            #     return curr_input[3], False
+            
+            # elif 'getitem_4' in self.layer_names_fx[imodule]:
+            #     print('\t\t-getitem_4')
+            #     return curr_input[4], False
+            
+            # elif 'cat' in self.layer_names_fx[imodule]:
+            #     print('\t\t-concatenating')
+            #     return torch.cat(curr_input, 1), False
                 
             elif 'x' == layer_name:
                 #logger.info('Model input layer.. skipping')
@@ -865,7 +939,7 @@ class SplitManager:
 
             # is final layer
             is_final_layer = self.total_layers_fx-1 == layer
-            is_operation = any([ el in curr_layer_name for el in ['relu', 'add', 'avg_pool2d', 'size', 'view', 'x'] ])
+            is_operation = any([ el in curr_layer_name for el in ['relu', 'add', 'avg_pool', 'max_pool', 'dropout', 'size', 'view', 'x'] ])
             if not (is_final_layer or is_operation):
                 # get layer from full module
                 curr_layer = split_network.get_current_module(self.model, layer)
@@ -899,7 +973,7 @@ class SplitManager:
             curr_layer_name = self.layer_names_fx[layer]
             
             is_final_layer = self.total_layers_fx-1 == layer
-            is_operation = any([ el in curr_layer_name for el in ['relu', 'add', 'avg_pool2d', 'size', 'view', 'x'] ])
+            is_operation = any([ el in curr_layer_name for el in ['relu', 'add', 'avg_pool', 'max_pool', 'dropout', 'size', 'view', 'x'] ])
 
             # assign to  struct if split layer
             if not (is_final_layer or is_operation):

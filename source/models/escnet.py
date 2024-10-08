@@ -15,57 +15,61 @@ import numpy as np
 class BasicBlock(nn.Module):
     def __init__(self, in_planes, planes, pool_kernel=2, pool_padding=0):
         super(BasicBlock, self).__init__()
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=(3,3), padding="same")
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=(3,3), padding="same")
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, padding="same", bias=False)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, padding="same", bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
         self.bn2 = nn.BatchNorm2d(planes)
-        self.pool = nn.MaxPool2d(pool_kernel, padding=pool_padding)
+        self.max_pool1 = nn.MaxPool2d(pool_kernel, padding=pool_padding)
         self.shortcut = nn.Sequential()
+        self.relu = nn.ReLU()
         
     def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
         out += self.shortcut(x)
-        out = self.pool(F.relu(out))
+        out = self.max_pool1(self.relu(out))
         
         return out
 
 class ResLike(nn.Module):
     def __init__(self, block, num_classes=10):
         super(ResLike, self).__init__()
-        self.conv1 = nn.Conv2d(15, 32, kernel_size=(7,7), padding="same")
-        self.conv2 = nn.Conv2d(32, 32, kernel_size=(3,3), padding="same")
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=7, padding="same", bias=False)
+        self.conv2 = nn.Conv2d(32, 32, kernel_size=3, padding="same", bias=False)
         self.layer1 = nn.Sequential(block(32, 32, pool_kernel=2))
         self.layer2 = nn.Sequential(block(32, 32, pool_kernel=2))
-        self.layer3 = nn.Sequential(block(32, 32, pool_kernel=2))
-        self.layer4 = nn.Sequential(block(32, 32, pool_kernel=2))
+        # self.layer3 = nn.Sequential(block(32, 32, pool_kernel=2))
+        # self.layer4 = nn.Sequential(block(32, 32, pool_kernel=2))
         
-        #self.hidden1 = nn.Linear(4160, 512)
-        self.hidden1 = nn.Linear(10240, 512)
-        self.hidden2 = nn.Linear(512, 256)
-        self.hidden3 = nn.Linear(256, 256)
+        # self.linear1 = nn.Linear(4160, 512, bias=False)
+        self.linear1 = nn.Linear(10240, 512, bias=False)
+        self.linear2 = nn.Linear(512, 256, bias=False)
+        # self.linear3 = nn.Linear(256, 256, bias=False)
         self.out = nn.Linear(256, num_classes)  # 128
         #######################
         self.relu = nn.ReLU()
         self.bn = nn.BatchNorm2d(32)
-        self.pool1 = nn.MaxPool2d(2)
-        self.pool2 = nn.AvgPool2d(2)
+        self.max_pool = nn.MaxPool2d(2)
+        self.avg_pool = nn.AvgPool2d(2)
     
-    def forward(self, *x):
-        if isinstance(x, tuple) and len(x)>1:
-            x = torch.cat((x[0],x[1],x[2],x[3],x[4]), dim=1)
+    # def forward(self, *x):
+    def forward(self, x):
+        # if isinstance(x, tuple) and len(x)>1:
+        #     x = torch.cat((x[0],x[1],x[2],x[3],x[4]), dim=1)
         # FOR CNN BASED IMPLEMENTATION
-        out = self.pool1(self.relu(self.bn(self.conv1(x))))
+        out = self.max_pool(self.relu(self.bn(self.conv1(x))))
         out = self.layer1(out)
         out = self.layer2(out)
         #out = self.layer3(out)
         #out = self.layer4(out)
-        out = self.pool2(self.relu(self.bn(self.conv2(out))))
+        out = self.avg_pool(self.relu(self.bn(self.conv2(out))))
         
         x = out.view(out.size(0), -1)
         
-        x = self.relu(self.hidden1(x))
-        x = self.relu(self.hidden2(x))
+        x = self.relu(self.linear1(x))
+        x = self.relu(self.linear2(x))
+        # x = self.relu(self.linear3(x))
+        # x = F.sigmoid(self.out(x))  # no softmax: CrossEntropyLoss()
         x = self.out(x)  # no softmax: CrossEntropyLoss()
         return x
     
@@ -78,9 +82,9 @@ class ResLike_(nn.Module):
         self.layer3 = nn.Sequential(block(32, 32, pool_kernel=3, pool_padding=1))
         self.layer4 = nn.Sequential(block(32, 32, pool_kernel=3, pool_padding=1))
         
-        self.hidden1 = nn.Linear(4160, 512)
-        self.hidden2 = nn.Linear(512, 256)
-        self.hidden3 = nn.Linear(256, 256)
+        self.linear1 = nn.Linear(4160, 512)
+        self.linear2 = nn.Linear(512, 256)
+        self.linear3 = nn.Linear(256, 256)
         self.out = nn.Linear(256, num_classes)  # 128
         #######################
         self.relu = nn.ReLU()
@@ -98,8 +102,8 @@ class ResLike_(nn.Module):
         
         x = out.view(out.size(0), -1)
         
-        x = self.relu(self.hidden1(x))
-        x = self.relu(self.hidden2(x))
+        x = self.relu(self.linear1(x))
+        x = self.relu(self.linear2(x))
         x = self.out(x)  # no softmax: CrossEntropyLoss()
         return x
         

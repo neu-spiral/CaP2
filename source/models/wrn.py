@@ -27,8 +27,9 @@ class BasicBlock(nn.Module):
         self.conv2 = conv_layer(out_planes, out_planes, kernel_size=3, stride=1,
                                padding=1, bias=False)
         self.droprate = dropRate
+        # self.dropout = nn.Dropout(p=self.droprate, training=self.training)
         self.equalInOut = (in_planes == out_planes)
-        self.convShortcut = (not self.equalInOut) and nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride,
+        self.shortcut = (not self.equalInOut) and nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride,
                                padding=0, bias=False) or None
 
     def forward(self, x):
@@ -40,19 +41,19 @@ class BasicBlock(nn.Module):
         if self.droprate > 0:
             out = F.dropout(out, p=self.droprate, training=self.training)
         out = self.conv2(out)
-        return torch.add(x if self.equalInOut else self.convShortcut(x), out)
+        return torch.add(x if self.equalInOut else self.shortcut(x), out)
 
-class NetworkBlock(nn.Module):
-    def __init__(self, nb_layers, in_planes, out_planes, block, stride, dropRate, conv_layer, bn_layer, bn_partition):
-        super(NetworkBlock, self).__init__()
-        self.layer = self._make_layer(block, in_planes, out_planes, nb_layers, stride, dropRate, conv_layer, bn_layer, bn_partition)
-    def _make_layer(self, block, in_planes, out_planes, nb_layers, stride, dropRate, conv_layer, bn_layer, bn_partition):
-        layers = []
-        for i in range(nb_layers):
-            layers.append(block(i == 0 and in_planes or out_planes, out_planes, i == 0 and stride or 1, dropRate, conv_layer, bn_layer, bn_partition))
-        return nn.Sequential(*layers)
-    def forward(self, x):
-        return self.layer(x)
+# class NetworkBlock(nn.Module):
+#     def __init__(self, nb_layers, in_planes, out_planes, block, stride, dropRate, conv_layer, bn_layer, bn_partition):
+#         super(NetworkBlock, self).__init__()
+#         self.layer = self._make_layer(block, in_planes, out_planes, nb_layers, stride, dropRate, conv_layer, bn_layer, bn_partition)
+#     def _make_layer(self, block, in_planes, out_planes, nb_layers, stride, dropRate, conv_layer, bn_layer, bn_partition):
+#         layers = []
+#         for i in range(nb_layers):
+#             layers.append(block(i == 0 and in_planes or out_planes, out_planes, i == 0 and stride or 1, dropRate, conv_layer, bn_layer, bn_partition))
+#         return nn.Sequential(*layers)
+#     def forward(self, x):
+#         return self.layer(x)
 
 class WideResNet(nn.Module):
     def __init__(self, depth, widen_factor, dropRate, conv_layer, bn_layer, num_classes, bn_partition=[1]*9, shrink=1):
@@ -64,18 +65,27 @@ class WideResNet(nn.Module):
         self.widen_factor = widen_factor
         block = BasicBlock
         # 1st conv before any network block
+
+
         self.conv1 = nn.Conv2d(3, nChannels[0], kernel_size=3, stride=1, padding=1, bias=False)
-        # 1st block
-        self.block1 = NetworkBlock(n, nChannels[0], nChannels[1], block, 1, dropRate, conv_layer, bn_layer, bn_partition.pop(0))
-        # 2nd block
-        self.block2 = NetworkBlock(n, nChannels[1], nChannels[2], block, 2, dropRate, conv_layer, bn_layer, bn_partition.pop(0))
-        # 3rd block
-        self.block3 = NetworkBlock(n, nChannels[2], nChannels[3], block, 2, dropRate, conv_layer, bn_layer, bn_partition.pop(0))
+        # # 1st block
+        # self.layer1 = NetworkBlock(n, nChannels[0], nChannels[1], block, 1, dropRate, conv_layer, bn_layer, bn_partition.pop(0))
+        # # 2nd block
+        # self.layer2 = NetworkBlock(n, nChannels[1], nChannels[2], block, 2, dropRate, conv_layer, bn_layer, bn_partition.pop(0))
+        # # 3rd block
+        # self.layer3 = NetworkBlock(n, nChannels[2], nChannels[3], block, 2, dropRate, conv_layer, bn_layer, bn_partition.pop(0))
+
+        self.layer1 = self._make_layer(block, nChannels[0], nChannels[1], n, 1, dropRate, conv_layer, bn_layer, bn_partition.pop(0))
+        self.layer2 = self._make_layer(block, nChannels[1], nChannels[2], n, 2, dropRate, conv_layer, bn_layer, bn_partition.pop(0))
+        self.layer3 = self._make_layer(block, nChannels[2], nChannels[3], n, 2, dropRate, conv_layer, bn_layer, bn_partition.pop(0))
+
+
         # global average pooling and classifier
         num_bn = bn_partition.pop(0)
         self.bn1 = bn_layer(nChannels[3]) if num_bn==1 else bn_layer(nChannels[3], num_bn)
         self.relu = nn.ReLU(inplace=True)
-        self.fc = nn.Linear(nChannels[3], num_classes)
+        self.avg_pool = nn.AvgPool2d(8)
+        self.out = nn.Linear(nChannels[3], num_classes)
         self.nChannels = nChannels[3]
 
         for m in self.modules():
@@ -88,15 +98,21 @@ class WideResNet(nn.Module):
             elif isinstance(m, nn.Linear):
                 m.bias.data.zero_()
 
+    def _make_layer(self, block, in_planes, out_planes, nb_layers, stride, dropRate, conv_layer, bn_layer, bn_partition):
+        layers = []
+        for i in range(nb_layers):
+            layers.append(block(i == 0 and in_planes or out_planes, out_planes, i == 0 and stride or 1, dropRate, conv_layer, bn_layer, bn_partition))
+        return nn.Sequential(*layers)
+
     def forward(self, x):
         out = self.conv1(x)
-        out = self.block1(out)
-        out = self.block2(out)
-        out = self.block3(out)
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
         out = self.relu(self.bn1(out))
-        out = F.avg_pool2d(out, 8)
+        out = self.avg_pool(out)
         out = out.view(-1, self.nChannels)
-        return self.fc(out)
+        return self.out(out)
 
 def wrn16_8(conv_layer, bn_layer, **kwargs):
     bn_partition = kwargs['bn_partition'] if 'bn_partition' in kwargs else [1]*9
