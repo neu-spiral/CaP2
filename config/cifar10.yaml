@@ -41,4 +41,5 @@ comm_outsize: True
 lambda_comm: 0.000001
 lambda_comp: 0
 create_partition: False
-load_model: True
+load_dense_model: True
+load_pruned_model: False
