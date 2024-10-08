@@ -1,23 +1,23 @@
-device: cuda:0
+device: cuda:1
 model: EscFusion
 data_code: esc
 num_classes: 2
 
-epochs: 10
+epochs: 300
 batch_size: 32
 optimizer: adam
 lr_scheduler: cosine
-learning_rate: 0.01
+learning_rate: 0.0001
 seed: 1234
 
 sparsity_type: kernel
-prune_ratio: 0.85
+prune_ratio: 0.7
 admm: True
 admm_epochs: 300
 rho: 0.01
 multi_rho: True
 retrain_bs: 128
-retrain_lr: 0.001
+retrain_lr: 0.00001
 retrain_ep: 100
 retrain_opt: adam
 

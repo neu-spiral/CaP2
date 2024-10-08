@@ -140,16 +140,20 @@ def set_optimizer(configs, model, train_loader, opt, lr, epochs):
             # Adversarial Concurrent Training: Optimizing Robustness and Accuracy Trade-off of Deep Neural Networks
             if epochs > 150:
                 # epoch_milestones = [60, 120, 160]
-                epoch_milestones = [80, 200]
+                # epoch_milestones = [80, 200]
+                epoch_milestones = [200, 250]
             else:
                 # epoch_milestones = [65, 90]
-                epoch_milestones = [65]
+                # epoch_milestones = [65]
+                epoch_milestones = [80]
         else:
             gamma=0.1
             if epochs > 150:
-                epoch_milestones = [80, 150]
+                # epoch_milestones = [80, 150]
+                epoch_milestones = [200]
             else:
-                epoch_milestones = [65, 90]
+                # epoch_milestones = [65, 90]
+                epoch_milestones = [80]
         # gamma=1.0
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[i * len(train_loader) for i in epoch_milestones], gamma=gamma)
     #print(epochs, [i * len(train_loader) for i in epoch_milestones])

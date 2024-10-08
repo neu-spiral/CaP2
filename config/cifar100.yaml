@@ -8,17 +8,17 @@ epochs: 300
 batch_size: 128
 optimizer: sgd
 lr_scheduler: default
-learning_rate: 0.01
+learning_rate: 0.1
 seed: 1234
 
 sparsity_type: kernel
-prune_ratio: 0.8
+prune_ratio: 0.75
 admm: True
 admm_epochs: 300
 rho: 0.0001
 multi_rho: True
 retrain_bs: 128
-retrain_lr: 0.001
+retrain_lr: 0.01
 retrain_ep: 100
 retrain_opt: default
 
@@ -39,7 +39,7 @@ bn_type: masked
 
 par_first_layer: True
 comm_outsize: True
-lambda_comm: 0.0001
+lambda_comm: 0.000001
 lambda_comp: 0
-create_partition: False
-load_model: True
+create_partition: True
+load_model: False
