@@ -21,9 +21,10 @@ def prep_data(tensor):
 def main():
     parser = argparse.ArgumentParser(description="Leaf node data collector and sender.")
     parser.add_argument("config_file", type=str, help="Path to the configuration file.")
+    parser.add_argument('-b', '--batch_size', type=int, help='Expected batch size of inputs', default=16)
     args = parser.parse_args()
 
-    batch_size = 16 # TODO: add as argument
+    batch_size =  args.batch_size
 
     # Load configuration
     with open(args.config_file, "r") as f:

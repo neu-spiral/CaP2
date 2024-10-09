@@ -1,6 +1,6 @@
 from source.utils import io
 
-from ..utils.misc import get_model_from_code
+from ..utils.misc import get_model_from_code, parse_filename
 from ..utils import split_network
 from ..utils.calculate_flops import calflops
 
@@ -11,6 +11,7 @@ import numpy as np
 import logging
 import os
 import sys
+import math
 
 # Logger initialization
 logger = logging.getLogger(__name__)
@@ -28,8 +29,9 @@ class SplitManager:
     - assign machines the final layer they have to compute 
     """
 
-    def __init__(self, configs, machine, N_machines, input_tensor, final_node, debug=False):
-        
+    def __init__(self, configs, machine, N_machines, final_node, input_tensor,  debug=False):
+        # TODO: make it run without input tensor input 
+
         torch.manual_seed(configs['seed'])
         self.configs = configs
         self.model_file = configs['model_file']
@@ -50,9 +52,13 @@ class SplitManager:
         self.output_channel_map = None
         self.device = configs['device']
 
+        #if input_tensor == []:
+        #    # TODO: update to compare with batch size 
+        #    test_loader = get_dataset_from_code(self.configs['data_code'], self.configs['batch_size'])[1]
+
         # load model TODO: only load what is necessary for this thread
         model = get_model_from_code(configs).to(configs['device']) # grabs model architecture from ./source/models/escnet.py
-        state_dict = torch.load(io.get_model_path_split("{}".format(configs["load_model"])), map_location=configs['device'])
+        state_dict = torch.load(io.get_model_path_split("{}".format(configs["model_file"])), map_location=configs['device'])
         self.model = io.load_state_dict(model, 
                     state_dict['model_state_dict'] if 'model_state_dict' in state_dict 
                     else state_dict['state_dict'] if 'state_dict' in state_dict else state_dict,)
@@ -61,7 +67,7 @@ class SplitManager:
         self.model.eval()
 
         # residual connections/block related
-        self.layer_names_fx =  get_graph_node_names(model)[1]
+        self.layer_names_fx = get_graph_node_names(model)[1]
         self.add_extra_partition_logic(final_node) # TODO: expand this to cover all models 
         self.layer_names_fx.append('FINAL_MODEL_OUTPUT')
         self.total_layers_fx = len(self.layer_names_fx)
@@ -111,6 +117,16 @@ class SplitManager:
             self.configs['partition']['linear.weight'] = linear_map
             self.configs['partition']['FINAL_MODEL_OUTPUT.weight'] = { 'channel_id' : [np.array([])]*self.N_machines }
             self.configs['partition']['FINAL_MODEL_OUTPUT.weight']['channel_id'][final_node] = np.arange(N_cout_linear) # send all outputs to machine final_node
+        
+        elif model_name == 'resnet101':
+            N_cout_linear = 100
+
+            # add logic for final layer TODO: add this in automatically somewhere
+            linear_map = SplitManager.get_io_for_linear(self.configs, self.layer_names_fx, self.N_machines, final_node, N_cout_linear)
+            self.configs['partition']['out.weight'] = linear_map
+            self.configs['partition']['FINAL_MODEL_OUTPUT.weight'] = { 'channel_id' : [np.array([])]*self.N_machines }
+            self.configs['partition']['FINAL_MODEL_OUTPUT.weight']['channel_id'][final_node] = np.arange(N_cout_linear) # send all outputs to machine final_node
+
         else:
             logger.warning(f'Did not add any logic for final execution of {model_name} model')
 
@@ -969,6 +985,10 @@ class SplitManager:
 
         split_layers = {} # init dictionary 
 
+        # for printing progress
+        step= 5 # percent
+        layers_for_machine = self.final_layer+1- self.starting_layer
+
         for layer in range(self.starting_layer, self.final_layer+1):
             curr_layer_name = self.layer_names_fx[layer]
             
@@ -977,8 +997,13 @@ class SplitManager:
 
             # assign to  struct if split layer
             if not (is_final_layer or is_operation):
-                layer_path = os.path.join(split_layer_dir, f'{curr_layer_name}.pth')
+                layer_path = os.path.join(split_layer_dir,  f'{curr_layer_name}.pth')
                 split_layers[curr_layer_name] = torch.load(layer_path, map_location=self.device).eval()
+
+            if self.debug:
+                percent_done = ((layer-self.starting_layer)/layers_for_machine)*100
+                if (math.floor(percent_done) % step) == 0:
+                    logger.debug(f'Loaded {percent_done}%% of split layers')
 
         return split_layers
 

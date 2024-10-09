@@ -26,10 +26,11 @@ from os import environ
 import sys
 import numpy as np
 import torch.nn as nn
+import re
 
 from source.utils.dataset import *
 from source.core import engine
-from source.utils import misc
+from source.utils import misc, io
 from source.core import run_partition
 
 from torchvision.models.feature_extraction import create_feature_extractor, get_graph_node_names
@@ -335,31 +336,46 @@ def combine_all_inputs(input_struct, num_machines):
                     
     return combined_input
 
-def config_setup_resnet(num_nodes, model_file_path):
+def config_setup(num_nodes, model_file, device, dtype='float32'):
     '''  
-        Construct the  config for how the model should be split 
-        TODO: avoid having to load model here, should only be loaded once in split manager
+        Construct the config with partition datastructures and load the pruned model 
+        TODO: avoid having to load model here if possible, just need to save off the model layer names for 
+        TODO: reimplement to handle grabbing different yaml files for N nodes
 
         Input:
             num_nodes -- (int) number of network nodes. This splits the model evenly between all nodes
+            model_file -- (str) model filename, can be dense or pruned as long as it follows the convention expected by parse_filename
+            device -- (str) device to load model on and add to config e.g. 'cpu', 'cuda:0'
+            dtype -- (str) precision
     '''
 
-    # setup config
-    sys.argv = [sys.argv[0]] # clear sys args 
-    dataset='cifar10' # TODO: automatically determine from inputs  
-    environ["config"] = f"config/{dataset}.yaml"
-    configs = run_partition.main()
+    # parse model file 
+    parameters = misc.parse_filename(model_file)
+    dataset = parameters['dataset']
 
-    configs["device"] = "cpu"
-    configs['load_model'] = model_file_path
+    # setup config
+    filepath = os.path.join('config', f'{dataset}.yaml')
+    configs = io.load_yaml(filepath)
+
+    # adjust setup model specific parameter
+    configs['num_partition'] = num_nodes
+    configs['prune_ratio'] = parameters['pr']
+    configs['lambda_comm'] = parameters['lcm']
+    configs["device"] = device 
+    configs['model_file'] = model_file
     configs["num_partition"] = str(num_nodes)
     configs['dtype'] = 'float32'
 
+    # grab partition configuration
+    # TODO: generalize to work with tree and star topology 
+    model_name = configs['model']
+    configs['partition_path'] = os.path.join('config',f'{model_name}-np{num_nodes}.yaml')
+
     # load model 
-    model = misc.get_model_from_code(configs).to(configs['device']) 
+    model = misc.get_model_from_code(configs).to(configs['device']) # requires 
 
     # populate config
-    input_var = engine.get_input_from_code(configs)
+    input_var = engine.get_input_from_code(configs) # requires data_code 
     configs = engine.partition_generator(configs, model) # Config partitions and prune_ratio
     configs['partition'] = engine.featuremap_summary(model, configs['partition'], input_var) # Compute output size of each layer
 
