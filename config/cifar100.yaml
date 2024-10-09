@@ -8,7 +8,7 @@ epochs: 300
 batch_size: 128
 optimizer: sgd
 lr_scheduler: default
-learning_rate: 0.1
+learning_rate: 0.01
 seed: 1234
 
 sparsity_type: kernel
@@ -18,7 +18,7 @@ admm_epochs: 300
 rho: 0.0001
 multi_rho: True
 retrain_bs: 128
-retrain_lr: 0.01
+retrain_lr: 0.001
 retrain_ep: 100
 retrain_opt: default
 

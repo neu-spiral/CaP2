@@ -19,7 +19,7 @@ class MoP:
         
         torch.manual_seed(configs['seed'])
         self.configs = configs
-        self.model_file = configs['model_file']
+        self.model_file = configs['load_pruned_model_file']
         
         # Handle dataset
         self.train_loader, self.test_loader = get_dataset_from_code(configs['data_code'], configs['batch_size'])

@@ -14,13 +14,13 @@ os.makedirs("logs", exist_ok=True)
 prune_ratios = [0.5, 0.7, 0.75, 0.8, 0.85]
 
 # lambda_comms = [0.000001, 0.00001, 0.0001]
-lambda_comms = [0.0001]
+lambda_comms = [0.000001]
 # lambda_comms = [10, 100, 1000]
 
 # num_partitions = ['2', '8', '16']
 num_partitions = ['4']
 
-device = 'cuda:2'
+device = 'cuda:0'
 
 # dataset="cifar10"
 # model="resnet18"
