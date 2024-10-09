@@ -23,6 +23,8 @@ def main():
     parser.add_argument("config_file", type=str, help="Path to the configuration file.")
     args = parser.parse_args()
 
+    batch_size = 16 # TODO: add as argument
+
     # Load configuration
     with open(args.config_file, "r") as f:
         config = json.load(f)
@@ -30,7 +32,7 @@ def main():
     servers = [(srv['ip'], srv['port']) for srv in config['servers']]
     send_data = [srv['data'] == 'True' for srv in config['servers']]
 
-    tensor = torch.rand((1,3,32,32)) # single image from cifar 
+    tensor = torch.rand((batch_size,3,32,32)) # single image from cifar 
 
     # 3 send each server different data 
     for iserver in range(len(servers)):
