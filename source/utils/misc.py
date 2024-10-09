@@ -64,6 +64,26 @@ def get_input_from_code(configs):
     input_var = tuple(Variable(torch.FloatTensor(x), requires_grad=False).to(device) for x in input_np)
     # input_var = torch.cat(input_var, dim=1)
     return input_var
+
+def get_input_dim(configs, batch):
+    ''' get dimensions of input tensors to model '''
+
+    if configs['data_code'] == 'flash':
+        print('flash input size not supported ')
+        return -1
+        input_shape = [(2, 1),
+                    #    (90, 160, 3),
+                       (360, 640, 3),
+                       (20, 20, 20),]
+    elif configs['data_code'] == 'esc':
+        # input_shape = [(15, 266, 320)]
+        input_shape = [(batch, 3, 266, 320)]
+        # input_shape = [(3, 266, 320) for _ in range(5)]
+    else:
+        input_shape = [(batch, 3, 32, 32)]
+    
+    return input_shape
+
     
 def get_layers(layer_type):
     """
@@ -266,3 +286,57 @@ class GradualWarmupScheduler(_LRScheduler):
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
         return param_group['lr']
+
+def parse_filename(filename):
+    ''' Parse filenamse of pruned models e.g. cifar10-resnet18-kernel-np4-pr0.5-lcm0.0001.pt
+        and cifar100-resnet101-kernel-np4-pr0.7-lcm1e-06.pt and dense models cifar10-resnet18.pt'''
+
+    # Remove the file extension
+    filename = filename.replace('.pt', '')
+    
+    # Split the filename by '-'
+    parts = filename.split('-')
+    
+    if len(parts) == 2:
+        # dense model
+        parts += [None, 1, 0, 0]
+
+    elif len(parts) == 6:
+        # pruned model
+
+        # Check for scientific notation and handle it
+        # The last part (lcm value) might have been split due to the hyphen in '1e-6'
+        if 'e' in parts[-2]:  # e.g., 'lcm1e' in 'lcm1e-06'
+            lcm_value = parts[-2] + '-' + parts[-1]  # Join '1e' with '-6'
+            parts = parts[:-2]  # Remove the last two parts
+            parts.append(lcm_value)  # Add the corrected lcm value
+        
+        # remove labels
+        parts[4] = parts[4].replace('pr', '')  # pr0.5 (parses as 0.5)
+        parts[5] = parts[5].replace('lcm', '')  # lcm1e-6 (parses as 1e-6)
+        
+        # make dict
+        params_list = ['dataset', 'model', 'sparsity_type', 'np', 'pr', 'lcm']
+        
+    else:
+        print(f'Unrecongized model name format {filename}')
+        return -1
+    
+    parsed_info = dict(zip(params_list,parts))
+
+    return parsed_info
+
+def get_rand_tensor(size, device, precision):
+    ''' used to generate random input to test model '''
+
+    input_tensor = torch.rand(size, device=torch.device(device))
+    #data_loader_train, data_loader_test = dataset.get_dataset_from_code(configs['data_code'], batch_size)
+    if precision == 'float64':
+        input_tensor = input_tensor.type(torch.float64)
+    elif precision == 'float32':
+        input_tensor = input_tensor.type(torch.float32)
+    else:
+        print('Unrecognized dtype ')
+        return -1
+    
+    return input_tensor

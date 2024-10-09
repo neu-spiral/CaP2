@@ -1,4 +1,4 @@
-device: cuda:2
+device: cpu
 model: resnet18
 data_code: cifar10
 num_classes: 10

@@ -56,11 +56,16 @@ def main():
     parser.add_argument('node', type=int, help='Node in the network to launch server for')
     parser.add_argument('model_file', type=str, help='File model file name e.g. cifar10-resnet18-kernel-npv0-pr0.75-lcm0.001.pt')
     parser.add_argument('log_dir_name', type=str, help='Directory name that log outputs are saved to i.e. CaP/logs/[logdir name]')
+    parser.add_argument('-b', '--batch_size', type=int, help='Expected batch size of inputs', default=16)
+    parser.add_argument('-d', '--device', type=str, help='Computation device e.g. cpu, cuda:0, etc.', default='cpu')
+    parser.add_argument('-p', '--precision', type=str, help='Computational precision', default='float32')
     parser.add_argument('--debug', action=argparse.BooleanOptionalAction)
     parser.add_argument('debug', choices=['True', 'False'], default='True', help='Check each output tensor of split model')
     args = parser.parse_args()
 
-    batch_size = 1 # TODO: functionalize and come up with better implementation? remove batch size here, remove input tensor as a required input to split_manager, and skip accuracy ckecks during running (assume this is done offline)
+    device= args.device
+    dtype = args.precision
+    batch_size = args.batch_size # TODO: run split model should be able to handle arbirary batch size 
 
     machine_number = args.node
     model_name = args.model_file.split('-')[1]
@@ -101,26 +106,16 @@ def main():
     logger.info(f"Required Clients: {required_clients}")
 
     # make split manager for executing split execution 
-    # TODO: generalize 
-    configs = split_network.config_setup_resnet(num_nodes, args.model_file)
+    configs = split_network.config_setup(num_nodes, args.model_file, device, dtype)
 
     # file path for split layers
-    configs['split_layers_path'] = os.path.join('assets','models',f'vsplit-{args.model_file[:-3]}', f'machine-{args.node}')
+    configs['split_layers_path'] = os.path.join('assets','models','perm', f'vsplit-{args.model_file[:-3]}', f'machine-{args.node}')
 
-    input_tensor = torch.rand(batch_size, 3, 32, 32, device=torch.device(configs['device']))
-    #data_loader_train, data_loader_test = dataset.get_dataset_from_code(configs['data_code'], batch_size)
-    if 'dtype' in configs:
-        if configs['dtype'] == 'float64':
-            input_tensor = input_tensor.type(torch.float64)
-        elif configs['dtype'] == 'float32':
-            input_tensor = input_tensor.type(torch.float32)
-        else:
-            logging.error('Unsupported dtype')
-    else:
-        logger.warning('No dtype field found in config')
-    
+    # TODO: load from dataset
+    input_size = misc.get_input_dim(configs, batch_size)[0] # TODO: handle different input sizes for esc and flashnet?
+    tensor = misc.get_rand_tensor(input_size, configs['device'], configs['dtype'])
 
-    model_manager = split_manager.SplitManager(configs, args.node, num_nodes, input_tensor, final_node, split_manager_debug)
+    model_manager = split_manager.SplitManager(configs, args.node, num_nodes, final_node, tensor, split_manager_debug)
 
     # open ip map 
     with open(args.ip_map_file, 'r') as file:
