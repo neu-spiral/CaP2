@@ -126,6 +126,14 @@ class SplitManager:
             self.configs['partition']['out.weight'] = linear_map
             self.configs['partition']['FINAL_MODEL_OUTPUT.weight'] = { 'channel_id' : [np.array([])]*self.N_machines }
             self.configs['partition']['FINAL_MODEL_OUTPUT.weight']['channel_id'][final_node] = np.arange(N_cout_linear) # send all outputs to machine final_node
+        elif model_name == 'EscFusion':
+            N_cout_linear = 2
+
+            # add logic for final layer TODO: add this in automatically somewhere
+            linear_map = SplitManager.get_io_for_linear(self.configs, self.layer_names_fx, self.N_machines, final_node, N_cout_linear)
+            self.configs['partition']['out.weight'] = linear_map
+            self.configs['partition']['FINAL_MODEL_OUTPUT.weight'] = { 'channel_id' : [np.array([])]*self.N_machines }
+            self.configs['partition']['FINAL_MODEL_OUTPUT.weight']['channel_id'][final_node] = np.arange(N_cout_linear) # send all outputs to machine final_node
 
         else:
             logger.warning(f'Did not add any logic for final execution of {model_name} model')
@@ -578,7 +586,7 @@ class SplitManager:
     @staticmethod
     def get_last_split_maps(configs, layer_names_fx, ilayer):
             '''
-                get the entire C_out and C_in map from the last conv layer 
+                get the entire C_out and C_in map from the last/previous conv layer 
 
                 Output:
                     cout_map - (list of np arrays) output channel assignment indexed by machine and elements in array correspond with output channels
@@ -844,7 +852,7 @@ class SplitManager:
             # skip if machine doesn't expect input
             if len(self.configs['partition'][split_param_name]['channel_id'][self.machine]) == 0:
                 logger.warning(f'No input assigned to this machine (but it was sent input?). Skipping...')
-                return -1, False
+                return -1, np.array([]), False
 
             # TODO: reconsider implementation 
             # What input channels does this machine compute?
@@ -882,7 +890,7 @@ class SplitManager:
     def init_expected_rx(self):
         '''
             Initializes data structure for machine to see what inputs it 
-            expects 
+            expects. FINAL_MODEL_OUTPUT is treated as it's own layer that needs to receive inputs
         '''
         expected_rx = {}
         for layer in range(self.starting_layer, self.final_layer+1):
