@@ -114,7 +114,7 @@ class SplitManager:
 
             # add logic for final layer TODO: add this in automatically somewhere
             linear_map = SplitManager.get_io_for_linear(self.configs, self.layer_names_fx, self.N_machines, final_node, N_cout_linear)
-            self.configs['partition']['linear.weight'] = linear_map
+            self.configs['partition']['out.weight'] = linear_map
             self.configs['partition']['FINAL_MODEL_OUTPUT.weight'] = { 'channel_id' : [np.array([])]*self.N_machines }
             self.configs['partition']['FINAL_MODEL_OUTPUT.weight']['channel_id'][final_node] = np.arange(N_cout_linear) # send all outputs to machine final_node
         
