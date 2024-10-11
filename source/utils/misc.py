@@ -291,6 +291,9 @@ def parse_filename(filename):
     ''' Parse filenamse of pruned models e.g. cifar10-resnet18-kernel-np4-pr0.5-lcm0.0001.pt
         and cifar100-resnet101-kernel-np4-pr0.7-lcm1e-06.pt and dense models cifar10-resnet18.pt'''
 
+    # make dict
+    params_list = ['dataset', 'model', 'sparsity_type', 'np', 'pr', 'lcm']
+
     # Remove the file extension
     filename = filename.replace('.pt', '')
     
@@ -302,21 +305,22 @@ def parse_filename(filename):
         parts += [None, 1, 0, 0]
 
     elif len(parts) == 6:
-        # pruned model
 
-        # Check for scientific notation and handle it
-        # The last part (lcm value) might have been split due to the hyphen in '1e-6'
-        if 'e' in parts[-2]:  # e.g., 'lcm1e' in 'lcm1e-06'
-            lcm_value = parts[-2] + '-' + parts[-1]  # Join '1e' with '-6'
-            parts = parts[:-2]  # Remove the last two parts
-            parts.append(lcm_value)  # Add the corrected lcm value
-        
         # remove labels
         parts[4] = parts[4].replace('pr', '')  # pr0.5 (parses as 0.5)
         parts[5] = parts[5].replace('lcm', '')  # lcm1e-6 (parses as 1e-6)
         
-        # make dict
-        params_list = ['dataset', 'model', 'sparsity_type', 'np', 'pr', 'lcm']
+    elif (len(parts) ==7 and 'e' in parts[-2]):
+        # pruned model
+
+        # handle scientific notation 
+        lcm_value = parts[-2] + '-' + parts[-1]  # Join '1e' with '-6'
+        parts = parts[:-2]  # Remove the last two parts
+        parts.append(lcm_value)  # Add the corrected lcm value
+    
+        # remove labels
+        parts[4] = parts[4].replace('pr', '')  # pr0.5 (parses as 0.5)
+        parts[5] = parts[5].replace('lcm', '')  # lcm1e-6 (parses as 1e-6)
         
     else:
         print(f'Unrecongized model name format {filename}')
