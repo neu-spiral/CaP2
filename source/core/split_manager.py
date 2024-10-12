@@ -1,7 +1,7 @@
 from source.utils import io
 
 from ..utils.misc import get_model_from_code, parse_filename
-from ..utils import split_network
+from ..utils import split_network, misc
 from ..utils.calculate_flops import calflops
 
 import torch
@@ -29,8 +29,7 @@ class SplitManager:
     - assign machines the final layer they have to compute 
     """
 
-    def __init__(self, configs, machine, N_machines, final_node, input_tensor,  debug=False):
-        # TODO: make it run without input tensor input 
+    def __init__(self, configs, machine, N_machines, final_node, batch_size=1, debug=False):
 
         torch.manual_seed(configs['seed'])
         self.configs = configs
@@ -84,10 +83,12 @@ class SplitManager:
         self.expected_tx = self.init_expected_tx()
 
         # debugging/ verification
-        # layer_output_size_LUT 
-        self.horz_output, self.layer_output_size_LUT = split_network.get_output_at_each_layer(model, input_tensor) # TODO: find a way to get layer_output_size_LUT without executing on every layer
+        # TODO: reimplement so model output validation still works. load_starting_data depends on self.layer_output_size_LUT wh
+        full_model_input = self.load_full_model_input( batch_size)
+        self.horz_output, self.layer_output_size_LUT = split_network.get_output_at_each_layer(model, full_model_input) # TODO: find a way to get layer_output_size_LUT without executing on every layer
 
-        self.current_tensor = torch.zeros(self.get_full_layer_input_size(), dtype=self.dtype, device=self.device) # keep track of tensor I/O on this node. This is the size of the full tensor input for layer = current_layer
+        # setup input tensor (size equal to full model, has non-zero values for channels this machine is responsible for calculating)
+        self.current_tensor = self.load_starting_tensor(full_model_input)
 
         if 'split_layers_path' in self.configs:
             split_layers_path = self.configs['split_layers_path']
@@ -430,13 +431,15 @@ class SplitManager:
 
         rx_from_nodes = np.array([])
         for data in collected_data:
-            if data['layer'] == self.current_layer-1:
-                rx_from_nodes = np.append(rx_from_nodes, data['node'])
-            elif look_for_start and 'start' in data:
+            # look for starting communication
+            if look_for_start and 'start' in data:
+                # starting tensor has been loaded upon object initialization 
                 logger.debug(f'Got starting queue for layer {self.current_layer}')
                 return 1
+            elif data['layer'] == self.current_layer-1:
+                # look for inputs for this layer
+                rx_from_nodes = np.append(rx_from_nodes, data['node'])
 
-        
         rx_from_nodes = np.sort(rx_from_nodes)
         
         if  N_expected == 0:
@@ -455,6 +458,45 @@ class SplitManager:
         else:
             logger.warning(f'Received unexpected inputs for layer={self.current_layer}')
             return 0
+    
+    def load_full_model_input(self, batch_size):
+        ''' 
+            Loads the entire input for the full model 
+            TODO: update so all machines are loading the same inputs from the dataset, using random with the proper input size for now  
+        '''
+
+        input_size = misc.get_input_dim(self.configs, batch_size)[0] # TODO: handle different input sizes for esc and flashnet?
+        full_model_input = torch.zeros(input_size, dtype=self.dtype, device=self.device) # keep track of tensor I/O on this node. This is the size of the full tensor input for layer = current_layer
+
+        return full_model_input
+
+    def load_starting_tensor(self, full_model_input):
+        '''  
+            Loads the input tensor for this machine by zeroing out the Cin channels not assinged to this machine 
+            OR creating a tensor of all zeros for bn layer starts
+
+            Outputs:
+                tensor - tensor input meant for this machine (subset of cin, all other cin are zeros)
+        '''
+    
+        if self.current_layer == 1:
+
+            # make zeros tensor
+            tensor = torch.zeros(full_model_input.shape, dtype=self.dtype, device=self.device) # keep track of tensor I/O on this node. This is the size of the full tensor input for layer = current_layer
+
+            # grab partition for this machine
+            current_layer_name = self.get_current_layer_name()
+            input_channels = self.configs['partition'][current_layer_name + '.weight']['channel_id'][self.machine]
+
+            # only use input channels meant for this machine
+            logger.debug(f'Loading input tensor for layer={self.current_layer} {current_layer_name}, channels={input_channels}')
+            # add to current tensor 
+            tensor[:, input_channels,] = full_model_input[:, input_channels, ]
+        
+        else:
+            tensor = torch.zeros(self.get_full_layer_input_size(), dtype=self.dtype, device=self.device) # keep track of tensor I/O on this node. This is the size of the full tensor input for layer = current_layer
+
+        return tensor
 
     def prep_output(self, out_tensor):
         ''' 
@@ -538,27 +580,22 @@ class SplitManager:
                     Cin - (1 x Cin' list) maps Cin' dimension to dimension in Cin of full input to this 
             
         '''
+        # nothing received for 1st layer, model input is already loaded 
+        if not (self.current_layer == 1):
+            count = 0
+            with torch.no_grad():
+                for data_dict in collected_data:
+                    if  data_dict['layer'] == self.current_layer -1:
+                        
+                        count += 1 # count each communication sent to this node
 
-        # TODO: update this to be dynamic
-        if self.current_layer == 1:
-            N_expected_rx = 1
-        else:
-            N_expected_rx = self.N_machines-1 
+                        if not data_dict['is_empty']:
+                            # get input channels
+                            input_channels = torch.tensor(data_dict['Cin'], device=self.device)
 
-        count = 0
-        with torch.no_grad():
-            for data_dict in collected_data:
-                if  data_dict['layer'] == self.current_layer -1:
-                    
-                    count += 1 # count each communication sent to this node
-
-                    if not data_dict['is_empty']:
-                        # get input channels
-                        input_channels = torch.tensor(data_dict['Cin'], device=self.device)
-
-                        # add to current tensor 
-                        # TODO: experiment with adding up on CPU first then sending to GPU vs sending over and over to GPU
-                        self.current_tensor[:, input_channels,] = data_dict['tensor'].to(self.device) + self.current_tensor.index_select(1, input_channels)
+                            # add to current tensor 
+                            # TODO: experiment with adding up on CPU first then sending to GPU vs sending over and over to GPU
+                            self.current_tensor[:, input_channels,] = data_dict['tensor'].to(self.device) + self.current_tensor.index_select(1, input_channels)
 
 
     def is_comm_layer(self, layer):

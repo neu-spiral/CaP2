@@ -12,7 +12,7 @@ network_graph_file=".\config\resnet_4_network\network-graph.json"
 model_file="esc-EscFusion-kernel-np4-pr0.5-lcm10.pt" # this doesnt need full path, io utils handle it
 
 log_dir_name='test' # saves logging messages to ./logs/[log_dir_name] 
-debug='False' # checks each split model output and calculates FLOPS when true
+debug='True' # checks each split model output and calculates FLOPS when true
 
 for key in $(jq -r 'keys[]' $ip_map_file); do
 

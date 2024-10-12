@@ -335,10 +335,16 @@ def get_rand_tensor(size, device, precision):
 
     input_tensor = torch.rand(size, device=torch.device(device))
     #data_loader_train, data_loader_test = dataset.get_dataset_from_code(configs['data_code'], batch_size)
-    if precision == 'float64':
-        input_tensor = input_tensor.type(torch.float64)
-    elif precision == 'float32':
-        input_tensor = input_tensor.type(torch.float32)
+    if type(precision) == str:
+        if precision == 'float64':
+            input_tensor = input_tensor.type(torch.float64)
+        elif precision == 'float32':
+            input_tensor = input_tensor.type(torch.float32)
+        else:
+            print('Unrecognized dtype ')
+            return -1
+    elif type(precision) == torch.dtype:
+        input_tensor = input_tensor.type(precision)
     else:
         print('Unrecognized dtype ')
         return -1

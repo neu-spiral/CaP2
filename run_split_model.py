@@ -115,7 +115,7 @@ def main():
     input_size = misc.get_input_dim(configs, batch_size)[0] # TODO: handle different input sizes for esc and flashnet?
     tensor = misc.get_rand_tensor(input_size, configs['device'], configs['dtype'])
 
-    model_manager = split_manager.SplitManager(configs, args.node, num_nodes, final_node, tensor, split_manager_debug)
+    model_manager = split_manager.SplitManager(configs, args.node, num_nodes, final_node, batch_size=batch_size, debug=split_manager_debug)
 
     # open ip map 
     with open(args.ip_map_file, 'r') as file:
@@ -167,15 +167,6 @@ def main():
                 else:
                     idle_time = (time.perf_counter() - idle_time_start)*1e3
                 logger.debug(f'Idle time={idle_time}ms for layer={model_manager.current_layer-1}') # PLOT THIS
-
-                # grab input tensor for debugging and final check 
-                # TODO: this implementation needs to be changed to accommodate escnet where full input is multiple tensors, also doesn't work if final node does not receive model input 
-                if model_manager.current_layer == 1 and model_manager.debug == True:
-                    input_tensor = get_input_tensor(collected_data)
-                    if torch.is_tensor(input_tensor):
-                        model_manager.update_horz_output(input_tensor)
-                    else:
-                        logger.warning('Could not find input tensor')
 
                 # execute split layers
 

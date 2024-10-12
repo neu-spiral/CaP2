@@ -53,10 +53,10 @@ Model inference over a network can be emulated by starting multiple threads on a
 7. Send inputs (WARNING only works for cifar10 inputs).:
 ~~~
 # Windows 
-python -m source.utils.send_leaf_split_model [path to config-leaf.json]
+python -m source.utils.send_start_message [path to config-leaf.json]
 
 # Linux
-python -m ./source/utils/send_leaf_split_model.py [path to config-leaf.json]
+python -m ./source/utils/send_start_message.py [path to config-leaf.json]
 ~~~
 
 Ouputs will appear in the logs/[dir log out] folder specified in the start servers script. Post processing and visaulization tools are found in sandbox/plot_timing.ipynb
@@ -77,9 +77,9 @@ Example colosseum run procedure (TODO: generalize, add detail, and verify works)
   open windows terminal in CaP repo  
   conda activate cap_nb  
   source env.sh  
-  python -m send_leaf_split_model colosseum/config-leaf.json  
+  python -m send_start_message colosseum/config-leaf.json  
   OR  
-  gnome-terminal -- bash -c "sshpass -p ChangeMe ssh genesys-115 'cd /root/CaP && source env.sh && source ../cap-310/bin/activate && python3 -m send_leaf_split_model colosseum/config-leaf.json; bash '" &
+  gnome-terminal -- bash -c "sshpass -p ChangeMe ssh genesys-115 'cd /root/CaP && source env.sh && source ../cap-310/bin/activate && python3 -m send_start_message colosseum/config-leaf.json; bash '" &
 
 
 ## Cite
