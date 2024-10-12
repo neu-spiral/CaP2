@@ -3,13 +3,26 @@
 #   Should be done before ./setup.sh and ./build_routes.sh
 #
 #   Example:
-#   ./start_servers_colosseum.sh "./nodes.txt" "./ip-map.json" "./network-graph.json" "cifar10-resnet18-kernel-npv0-pr0.75-lcm0.001.pt"
+#   ./start_servers_colosseum.sh "./nodes.txt" "./ip-map.json" "./network-graph.json" "cifar10-resnet18-kernel-npv0-pr0.75-lcm0.001.pt" "log_folder" 16
 #
-# Path to the JSON file
-nodes_file=$1
+
+# use in file inputs
+nodes_file="./nodes.txt" # Path to the JSON file
+ip_map_file="./ip-map.json"
+network_graph_file="./network-graph.json"
+model_file="cifar10-resnet18-kernel-npv0-pr0.75-lcm0.001.pt" # this doesnt need full path, io utils handle it. It does need the extension in the name .pt
+log_dur_name="/logs/cifar10-resnet18-kernel-npv0-pr0.75-lcm0.001"
+batch_size=16
+
+# use cmd line inputs
+:'
+nodes_file=$1 # Path to the JSON file
 ip_map_file=$2
 network_graph_file=$3
 model_file=$4 # this doesnt need full path, io utils handle it. It does need the extension in the name .pt
+log_dur_name="/logs/$5"
+batch_size=$6
+'
 
 # Read the input file line by line
 # iterate through each srn node
@@ -42,7 +55,7 @@ while IFS= read -r line; do
 
     # start servers on node 
     echo "Starting terminal session"
-    gnome-terminal -- bash -c "sshpass -p '$psswrd' ssh '$srn_name' 'cd /root/CaP && source env.sh && source ../cap-310/bin/activate && python3 run_split_model.py "colosseum/$ip_map_file" "colosseum/$network_graph_file" "$node_number" "$model_file" "False"; bash'" &
+    gnome-terminal -- bash -c "sshpass -p '$psswrd' ssh '$srn_name' 'cd /root/CaP && source env.sh && source ../cap-310/bin/activate && python3 run_split_model.py "colosseum/$ip_map_file" "colosseum/$network_graph_file" "$node_number" "$model_file" "$log_dur_name" -b $batch_size "False"; bash'" &
 
     echo ""
     echo ""

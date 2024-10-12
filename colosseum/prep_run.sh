@@ -13,11 +13,10 @@ rf_flag=false
 # TODO: remove hardcoded params for 2nd half
 final_node=1
 starting_port=49200 # Starting port definition TODO: increment this? Right not this does not change
-leaf_connection_type='server'
+leaf_connection_type='wifi'
 ip_map_file='ip-map.json'
 leaf_file='config-leaf.json'
 graph_file='network-graph.json'
-
 
 # Get the number of lines in the file
 num_lines=$(wc -l < "$1")
@@ -61,8 +60,8 @@ for ((i=1; i<=num_lines; i++)); do
 
       # Copy model to network node      
       echo "Copying $2.pt to $prefixed_number"
-      sshpass -p "scope" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/$2.pt /tmp/'"
-      sshpass -p "scope" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models && cp /tmp/$2.pt /root/CaP/assets/models/" &
+      sshpass -p "scope" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/$2.pt /tmp/ && cp -r /share/CaP-Models/vsplit-$2 /tmp/'"
+      sshpass -p "scope" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models/perm && cp /tmp/$2.pt /root/CaP/assets/models/perm/ && cp -r /tmp/vsplit-$2.pt /root/CaP/assets/models/perm/" &
       sleep 2
       
       ;;
@@ -89,8 +88,8 @@ for ((i=1; i<=num_lines; i++)); do
 
       # Copy model to network node      
       echo "Copying $2.pt to $prefixed_number"
-      sshpass -p "sunflower" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/$2.pt /tmp/'"
-      sshpass -p "sunflower" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models && cp /tmp/$2.pt /root/CaP/assets/models/" &
+      sshpass -p "sunflower" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/$2.pt /tmp/ && cp -r /share/CaP-Models/vsplit-$2 /tmp/'"
+      sshpass -p "sunflower" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models/perm && cp /tmp/$2.pt /root/CaP/assets/models/perm/ && cp -r /tmp/vsplit-$2.pt /root/CaP/assets/models/perm/" &
       sleep 2
 
       ;;
@@ -106,8 +105,8 @@ for ((i=1; i<=num_lines; i++)); do
 
       # Copy model to network node      
       echo "Copying $2.pt to $prefixed_number"
-      sshpass -p "ChangeMe" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/$2.pt /tmp/'"
-      sshpass -p "ChangeMe" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models && cp /tmp/$2.pt /root/CaP/assets/models/" &
+      sshpass -p "ChangeMe" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/$2.pt /tmp/ && cp -r /share/CaP-Models/vsplit-$2 /tmp/'"
+      sshpass -p "ChangeMe" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models/perm && cp /tmp/$2.pt /root/CaP/assets/models/ && cp -r /tmp/vsplit-$2.pt /root/CaP/assets/models/perm/" &
       sleep 2
       
       ;;

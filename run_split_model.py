@@ -55,7 +55,7 @@ def main():
     parser.add_argument('network_graph_file', type=str, help='Path to network graph JSON file')
     parser.add_argument('node', type=int, help='Node in the network to launch server for')
     parser.add_argument('model_file', type=str, help='File model file name e.g. cifar10-resnet18-kernel-npv0-pr0.75-lcm0.001.pt')
-    parser.add_argument('log_dir_name', type=str, help='Directory name that log outputs are saved to i.e. CaP/logs/[logdir name]')
+    parser.add_argument('log_dir', type=str, help='Directory and path name that log outputs are saved to i.e. [logdir name]')
     parser.add_argument('-b', '--batch_size', type=int, help='Expected batch size of inputs', default=16)
     parser.add_argument('-d', '--device', type=str, help='Computation device e.g. cpu, cuda:0, etc.', default='cpu')
     parser.add_argument('-p', '--precision', type=str, help='Computational precision', default='float32')
@@ -74,7 +74,7 @@ def main():
     ## START LOGGER CONFIGURATION
 
     # setup save directory for logs 
-    log_path = os.path.join('logs', args.log_dir_name)   
+    log_path = args.log_dir  
     os.makedirs(log_path, exist_ok=True) 
     if split_manager_debug:
         log_file_path = os.path.join( log_path, f'node{machine_number}_{model_name}_debug.log')

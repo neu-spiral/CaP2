@@ -50,7 +50,7 @@ Model inference over a network can be emulated by starting multiple threads on a
   bash local_network/start_servers_linus.sh
 ~~~
 6. Activate python environment  
-7. Send inputs (WARNING only works for cifar10 inputs).:
+7. Send inputs:
 ~~~
 # Windows 
 python -m source.utils.send_start_message [path to config-leaf.json]
@@ -63,24 +63,25 @@ Ouputs will appear in the logs/[dir log out] folder specified in the start serve
 
 ## Split Network Inference on Colosseum 
 Example colosseum run procedure (TODO: generalize, add detail, and verify works):
-1. connect to VPN via cisco
-2. make reservation
-3. wait until srn nodes are spun up
-4. manually configure colosseum/nodes.txt
-5. wait until srn nodes are running
-6. open bash session in CaP/colosseum repo
-7. move repo to snr nodes, start rf, and collect ip addresses:
-  bash ./setup.sh nodes_test.txt cifar10-resnet18-kernel-npv2-pr0.75-lcm0.001
-9. start servers for running split model:
-  bash ./start_servers_colosseum.sh "./nodes_test.txt" "./ip-map.json" "./network-graph.json" "cifar10-resnet18-kernel-npv2-pr0.75-lcm0.001.pt"
-10. send inputs to leaf nodes:  
-  open windows terminal in CaP repo  
-  conda activate cap_nb  
-  source env.sh  
-  python -m send_start_message colosseum/config-leaf.json  
-  OR  
-  gnome-terminal -- bash -c "sshpass -p ChangeMe ssh genesys-115 'cd /root/CaP && source env.sh && source ../cap-310/bin/activate && python3 -m send_start_message colosseum/config-leaf.json; bash '" &
-
+1. Connect to VPN via cisco
+2. Make a reservation
+3. Wait until SRN nodes are spun up
+4. Manually configure colosseum/nodes.txt
+5. Wait until srn nodes are running
+6. Open bash session in folder CaP/colosseum
+7. Move repo to snr nodes, start rf, collect ip addresses, build json configs: 
+  ~~~
+  bash ./prep_run.sh
+  ~~~
+9. Start servers on SRN nodes for split model execution:
+  ~~~
+  bash ./start_servers_colosseum.sh
+  ~~~
+10. Send starting message to nodes:  
+  ~~~ 
+  bash ./start_run.sh [srn #]
+  ~~~
+11. Inspect logging messages 
 
 ## Cite
 ```
