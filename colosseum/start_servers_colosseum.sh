@@ -40,12 +40,15 @@ while IFS= read -r line; do
     case "$node_type" in
         cell)
         psswrd="scope"
+        pyenv="cap-310" # TODO: configure cell container and update 
         ;;
         wifi)
         psswrd="sunflower"
+        pyenv="cap-39"
         ;;
         server)
         psswrd="ChangeMe"
+        pyenv="cap-39"
         ;;
     esac
 
@@ -55,7 +58,7 @@ while IFS= read -r line; do
 
     # start servers on node 
     echo "Starting terminal session"
-    gnome-terminal -- bash -c "sshpass -p '$psswrd' ssh '$srn_name' 'cd /root/CaP && source env.sh && source ../cap-310/bin/activate && python3 run_split_model.py "colosseum/$ip_map_file" "colosseum/$network_graph_file" "$node_number" "$model_file" "$log_dur_name" -b $batch_size "False"; bash'" &
+    gnome-terminal -- bash -c "sshpass -p '$psswrd' ssh '$srn_name' 'cd /root/CaP && source env.sh && source ../$pyenv/bin/activate && python3 run_split_model.py "colosseum/$ip_map_file" "colosseum/$network_graph_file" "$node_number" "$model_file" "$log_dur_name" -b $batch_size "False"; bash'" &
 
     echo ""
     echo ""

@@ -13,4 +13,4 @@
 
 # wifi
 sshpass -p sunflower scp config-leaf.json genesys-$1:/root/CaP/colosseum
-gnome-terminal -- bash -c "sshpass -p sunflower ssh genesys-$1 'cd /root/CaP && source env.sh && source ../cap-310/bin/activate && python3 -m source.utils.send_start_message ./config-leaf.json; bash '" &
+gnome-terminal -- bash -c "sshpass -p sunflower ssh genesys-$1 'cd /root/CaP && source env.sh && source ../cap-39/bin/activate && python3 -m source.utils.send_start_message ./config-leaf.json; bash '" &
