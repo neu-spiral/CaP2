@@ -10,8 +10,9 @@
 nodes_file="./nodes.txt" # Path to the JSON file
 ip_map_file="./ip-map.json"
 network_graph_file="./network-graph.json"
-model_file="cifar10-resnet18-kernel-npv0-pr0.75-lcm0.001.pt" # this doesnt need full path, io utils handle it. It does need the extension in the name .pt
-log_dur_name="/logs/cifar10-resnet18-kernel-npv0-pr0.75-lcm0.001"
+leaf_file="./config-leaf.json"
+model_file="cifar10-resnet18-kernel-np4-pr0.5-lcm0.0001.pt" # this doesnt need full path, io utils handle it. It does need the extension in the name .pt
+log_dur_name="/logs/cifar10-resnet18-kernel-np4-pr0.5-lcm0.0001"
 batch_size=16
 
 # use cmd line inputs
@@ -48,17 +49,18 @@ while IFS= read -r line; do
         ;;
         server)
         psswrd="ChangeMe"
-        pyenv="cap-39"
+        pyenv="cap-310"
         ;;
     esac
 
     # move locally built configs to nodes
     echo "Copying JSONs to node $srn_name($node_number)"
-    sshpass -p "$psswrd" scp "$ip_map_file" "$network_graph_file" "$leaf" "$srn_name":/root/CaP/colosseum
+    sshpass -p "$psswrd" scp "$ip_map_file" "$network_graph_file" "$leaf_file" "$srn_name":/root/CaP/colosseum
 
     # start servers on node 
     echo "Starting terminal session"
-    gnome-terminal -- bash -c "sshpass -p '$psswrd' ssh '$srn_name' 'cd /root/CaP && source env.sh && source ../$pyenv/bin/activate && python3 run_split_model.py "colosseum/$ip_map_file" "colosseum/$network_graph_file" "$node_number" "$model_file" "$log_dur_name" -b $batch_size "False"; bash'" &
+    gnome-terminal -- bash -c "sshpass -p '$psswrd' ssh '$srn_name' 'cd /root/CaP && source env.sh && source ../$pyenv/bin/activate && python3 run_split_model.py "colosseum/$ip_map_file" "colosseum/$network_graph_file" "$node_number" "$model_file" "$log_dur_name" -b $batch_size --debug "False" 2>&1 | tee output.log; bash'" &
+    #terminator -- bash -c "sshpass -p '$psswrd' ssh '$srn_name' 'cd /root/CaP && source env.sh && source ../$pyenv/bin/activate && python3 run_split_model.py "colosseum/$ip_map_file" "colosseum/$network_graph_file" "$node_number" "$model_file" "$log_dur_name" -b $batch_size --debug "False" 2>&1 | tee output.log; bash'" &
 
     echo ""
     echo ""
