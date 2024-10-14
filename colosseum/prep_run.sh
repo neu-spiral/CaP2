@@ -12,11 +12,11 @@ rf_flag=false
 
 node_file="nodes.txt"
 model_file="cifar10-resnet18-kernel-np4-pr0.5-lcm0.0001"
+leaf_connection_type='wifi' # CHANGE ME
 
 # TODO: remove hardcoded params for 2nd half
 final_node=1
 starting_port=49200 # Starting port definition TODO: increment this? Right not this does not change
-leaf_connection_type='wifi'
 ip_map_file='ip-map.json'
 leaf_file='config-leaf.json'
 graph_file='network-graph.json'
