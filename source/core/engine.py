@@ -19,7 +19,7 @@ class MoP:
         
         torch.manual_seed(configs['seed'])
         self.configs = configs
-        self.model_file = configs['model_file']
+        self.model_file = configs['load_pruned_model_file']
         
         # Handle dataset
         self.train_loader, self.test_loader = get_dataset_from_code(configs['data_code'], configs['batch_size'])
@@ -34,8 +34,8 @@ class MoP:
         self.model = get_model_from_code(configs).to(self.device)
         
         # Load pretrained weights
-        if configs["load_model"]:
-            state_dict = torch.load(get_model_path("{}".format(configs["load_model_file"])), map_location=self.device)
+        if configs["load_dense_model"]:
+            state_dict = torch.load(get_model_path("{}".format(configs["load_dense_model_file"])), map_location=self.device)
             self.model = load_state_dict(self.model, 
                                          state_dict['model_state_dict'] if 'model_state_dict' in state_dict 
                                          else state_dict['state_dict'] if 'state_dict' in state_dict else state_dict,)

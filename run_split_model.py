@@ -21,6 +21,7 @@ try:
     from source.core import split_manager, run_partition, engine
     from source.utils import misc, split_network
     from source.SplitModelNetworking import node
+    from source.utils import dataset
 except:
     sys.path.append(os.path.join(os.path.dirname(__name__), "..\source"))
     logger.warning(f"Current working directory: {os.getcwd()}")
@@ -28,6 +29,7 @@ except:
     from source.core import split_manager, run_partition, engine
     from source.utils import misc, split_network
     from source.SplitModelNetworking import node    
+    from source.utils import dataset
 
 def get_input_tensor(collected_data):
     '''
@@ -54,9 +56,16 @@ def main():
     parser.add_argument('node', type=int, help='Node in the network to launch server for')
     parser.add_argument('model_file', type=str, help='File model file name e.g. cifar10-resnet18-kernel-npv0-pr0.75-lcm0.001.pt')
     parser.add_argument('log_dir_name', type=str, help='Directory name that log outputs are saved to i.e. CaP/logs/[logdir name]')
+    parser.add_argument('-b', '--batch_size', type=int, help='Expected batch size of inputs', default=16)
+    parser.add_argument('-d', '--device', type=str, help='Computation device e.g. cpu, cuda:0, etc.', default='cpu')
+    parser.add_argument('-p', '--precision', type=str, help='Computational precision', default='float32')
     parser.add_argument('--debug', action=argparse.BooleanOptionalAction)
     parser.add_argument('debug', choices=['True', 'False'], default='True', help='Check each output tensor of split model')
     args = parser.parse_args()
+
+    device= args.device
+    dtype = args.precision
+    batch_size = args.batch_size # TODO: run split model should be able to handle arbirary batch size 
 
     machine_number = args.node
     model_name = args.model_file.split('-')[1]
@@ -97,25 +106,16 @@ def main():
     logger.info(f"Required Clients: {required_clients}")
 
     # make split manager for executing split execution 
-    # TODO: generalize 
-    configs = split_network.config_setup_resnet(num_nodes, args.model_file)
+    configs = split_network.config_setup(num_nodes, args.model_file, device, dtype)
 
     # file path for split layers
-    configs['split_layers_path'] = os.path.join('assets','models',f'vsplit-{args.model_file[:-3]}', f'machine-{args.node}')
+    configs['split_layers_path'] = os.path.join('assets','models','perm', f'vsplit-{args.model_file[:-3]}', f'machine-{args.node}')
 
-    input_tensor = torch.rand(1, 3, 32, 32, device=torch.device(configs['device']))
-    if 'dtype' in configs:
-        if configs['dtype'] == 'float64':
-            input_tensor = input_tensor.type(torch.float64)
-        elif configs['dtype'] == 'float32':
-            input_tensor = input_tensor.type(torch.float32)
-        else:
-            logging.error('Unsupported dtype')
-    else:
-        logger.warning('No dtype field found in config')
-    
+    # TODO: load from dataset
+    input_size = misc.get_input_dim(configs, batch_size)[0] # TODO: handle different input sizes for esc and flashnet?
+    tensor = misc.get_rand_tensor(input_size, configs['device'], configs['dtype'])
 
-    model_manager = split_manager.SplitManager(configs, args.node, num_nodes, input_tensor, final_node, split_manager_debug)
+    model_manager = split_manager.SplitManager(configs, args.node, num_nodes, final_node, tensor, split_manager_debug)
 
     # open ip map 
     with open(args.ip_map_file, 'r') as file:
@@ -151,13 +151,11 @@ def main():
                     server_threads[iserver].join()  # Wait for the server thread to finish
                 return True # end execution
 
-            # updates local tensor if enough input is present 
-            start_process_input = time.perf_counter()
-            enough_input = model_manager.process_input(collected_data) 
-            process_input_time = process_input_time + (time.perf_counter() - start_process_input)*1e3
+             # check that enough data is present
+            enough_input = model_manager.enough_comms_received(collected_data)
 
             # check if update was made 
-            if enough_input:
+            if enough_input > 0:
 
                 # start counting model exectuion time when enough input is received for first layer
                 # do not count idle time waiting for input
@@ -168,7 +166,7 @@ def main():
                     first_input_received = True
                 else:
                     idle_time = (time.perf_counter() - idle_time_start)*1e3
-                logger.debug(f'Idle time={idle_time}ms process input time={process_input_time}ms for layer={model_manager.current_layer-1}') # PLOT THIS
+                logger.debug(f'Idle time={idle_time}ms for layer={model_manager.current_layer-1}') # PLOT THIS
 
                 # grab input tensor for debugging and final check 
                 # TODO: this implementation needs to be changed to accommodate escnet where full input is multiple tensors, also doesn't work if final node does not receive model input 
@@ -180,32 +178,49 @@ def main():
                         logger.warning('Could not find input tensor')
 
                 # execute split layers
+
+                # start timers
                 execute_layers_start = time.perf_counter()
+                start_process_input = time.perf_counter()
+
+                # sum received data
+                model_manager.process_input(collected_data) 
+                process_input_time = (time.perf_counter() - start_process_input)*1e3
+
+                # execute split model 
                 output_tensor = model_manager.execute_layers_until_comms()
+
+                # log timing 
                 execute_layers_time = (time.perf_counter() - execute_layers_start)*1e3
                 prev_layer_name = model_manager.get_layer_name(model_manager.current_layer-1)
-                logger.debug(f'Executed to {prev_layer_name} layer={model_manager.current_layer-1} in time={execute_layers_time}ms') # PLOT THIS
+                logger.debug(f'Executed to {prev_layer_name} layer={model_manager.current_layer-1} in time={execute_layers_time}ms process input time={process_input_time}ms') # PLOT THIS
 
                 # TODO: add timing here
                 # always send output unless on final layer
                 if not model_manager.current_layer == model_manager.total_layers_fx:
-                    # prep output
+                    # start sending state 
+                    
+                    # prep output 
                     start_prep_out_start = time.perf_counter()
+                    send_nodes_start = time.perf_counter()
                     processed_output = model_manager.prep_output(output_tensor) # prepare communication. TODO: this probably takes awhile??
-                        
-                    # send data to correct node in network 
-                    logger.debug('Send to nodes start')
-                    node.send_to_nodes(processed_output, ip_map, connection_type)
-
-                    # remove data from the queue that was processed already 
-                    collected_data = [el for el in collected_data if el['layer'] != model_manager.current_layer-2]
                     prep_out_time = (time.perf_counter() - start_prep_out_start)*1e3
                     layer_sent = model_manager.current_layer-1
                     logger.debug(f'Prep output layer={layer_sent} time={prep_out_time}ms')
 
+                    # send data to correct node in network 
+                    logger.debug('Send to nodes start')
+                    node.send_to_nodes(processed_output, ip_map, connection_type)
+                    send_nodes_time = (time.perf_counter() - send_nodes_start)*1e3
+                    logger.debug(f'Sent layer={layer_sent} to nodes in time={send_nodes_time}ms')
+
                 # start idle timer and reset process input timer
                 idle_time_start = time.perf_counter()
-                process_input_time = 0
+                
+                # clean out queue TODO: compare methods 
+                #collected_data = [el for el in collected_data if el['layer'] != model_manager.current_layer-2]
+                collected_data = list(filter(lambda el: el['layer'] != model_manager.current_layer-2, collected_data))
+
             else:
                 # continue waiting
                 collected_data = collected_data + node.collect_data_from_server(client_data_queue, 1, model_manager.current_layer)

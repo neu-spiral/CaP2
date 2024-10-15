@@ -37,8 +37,10 @@ def get_args():
     parser.add_argument('-reopt', '--retrain_opt', default='',type=str, help='retraining optimizer')
     parser.add_argument('-rett', '--retraining_type', default='',type=str, help='retraining types [hsictprune|backprop]')
     parser.add_argument('-slmo', '--save_last_model_only', action='store_true', help='save last model only')
-    parser.add_argument('-lm', '--load_model', default=False, type=bool, help='use pre-trained model')
-    parser.add_argument('-lmf', '--load_model_file', default='', type=str, help='filename of the pre-trained model file')
+    parser.add_argument('-ldm', '--load_dense_model', default=False, type=bool, help='use pre-trained model')
+    parser.add_argument('-ldmf', '--load_dense_model_file', default='', type=str, help='filename of the pre-trained model file')
+    parser.add_argument('-lpm', '--load_pruned_model', default=False, type=bool, help='use pruned model')
+    parser.add_argument('-lpmf', '--load_pruned_model_file', default='', type=str, help='filename of the pruned model file')
     
     # control the weight of xentropy and hsic, if not specified in yaml file
     parser.add_argument('-xw', '--xentropy_weight', default=0,type=float, help='how much weight to put on xentropy wrt hsic')
@@ -82,8 +84,8 @@ def main():
     config_dict = load_yaml(args.config)
     
     # gpu device
-    # if args.device:
-    if not 'device' in config_dict:
+    if args.device:
+    # if not 'device' in config_dict and args.device:
         config_dict['device'] = args.device
     
     # partition
@@ -93,8 +95,8 @@ def main():
     # if args.comm_outsize:
     if 'comm_outsize' not in config_dict and args.comm_outsize:
         config_dict['comm_outsize'] = args.comm_outsize
-    # if args.num_partition:
-    if 'num_partition' not in config_dict and args.num_partition:
+    if args.num_partition:
+    # if 'num_partition' not in config_dict and args.num_partition:
         config_dict['num_partition'] = args.num_partition
     # if args.layer_type:
     if 'layer_type' not in config_dict and args.layer_type:
@@ -102,8 +104,8 @@ def main():
     # if args.bn_type:
     if 'bn_type' not in config_dict and args.bn_type:
         config_dict['bn_type'] = args.bn_type
-    # if args.lambda_comm:
-    if 'lambda_comm' not in config_dict and args.lambda_comm:
+    if args.lambda_comm:
+    # if 'lambda_comm' not in config_dict and args.lambda_comm:
         config_dict['lambda_comm'] = args.lambda_comm
     # if args.lambda_comp:
     if 'lambda_comp' not in config_dict and args.lambda_comp:
@@ -135,10 +137,14 @@ def main():
     if 'model_file' not in config_dict and args.model_file:
         config_dict['model_file'] = args.model_file
     # if args.load_model:
-    if 'load_model' not in config_dict and args.load_model:
-        config_dict['load_model'] = args.load_model
-    if 'load_model_file' not in config_dict and args.load_model_file:
-        config_dict['load_model_file'] = args.load_model_file
+    if 'load_dense_model' not in config_dict and args.load_dense_model:
+        config_dict['load_dense_model'] = args.load_dense_model
+    if 'load_dense_model_file' not in config_dict and args.load_dense_model_file:
+        config_dict['load_dense_model_file'] = args.load_dense_model_file
+    if 'load_pruned_model' not in config_dict and args.load_pruned_model:
+        config_dict['load_pruned_model'] = args.load_pruned_model
+    if 'load_pruned_model_file' not in config_dict and args.load_pruned_model_file:
+        config_dict['load_pruned_model_file'] = args.load_pruned_model_file
     # if args.batch_size:
     if 'batch_size' not in config_dict and args.batch_size:
         config_dict['batch_size'] = args.batch_size
@@ -167,8 +173,8 @@ def main():
     # if args.sparsity_type:
     if 'sparsity_type' not in config_dict and args.sparsity_type:
         config_dict['sparsity_type'] = args.sparsity_type
-    # if args.prune_ratio:
-    if 'prune_ratio' not in config_dict and args.prune_ratio:
+    if args.prune_ratio or args.prune_ratio == 0:
+    # if 'prune_ratio' not in config_dict and args.prune_ratio:
         config_dict['prune_ratio'] = args.prune_ratio
     # if args.rho:
     if 'rho' not in config_dict and args.rho:
@@ -229,14 +235,14 @@ def main():
         config_dict['smooth'] = False 
     if 'smooth_eps' not in config_dict and args.smooth_eps:
         config_dict['smooth_eps'] = 0 
+
+    config_dict['load_pruned_model_file'] = f"{config_dict['data_code']}-{config_dict['model']}-{config_dict['sparsity_type']}-np{config_dict['num_partition']}-pr{config_dict['prune_ratio']}-lcm{config_dict['lambda_comm']}.pt"
+    config_dict['partition_path'] = f"config/{config_dict['model']}-np{config_dict['num_partition']}.yaml"
+    config_dict['load_dense_model_file'] = f"{config_dict['data_code']}-{config_dict['model']}.pt"
     
     for key, val in config_dict.items():
         print(key, ': ', val)
-
-    config_dict['model_file'] = f"{config_dict['data_code']}-{config_dict['model']}-{config_dict['sparsity_type']}-np{config_dict['num_partition']}-pr{config_dict['prune_ratio']}-lcm{config_dict['lambda_comm']}.pt"
-    config_dict['partition_path'] = f"config/{config_dict['model']}-np{config_dict['num_partition']}.yaml"
-    config_dict['load_model_file'] = f"{config_dict['data_code']}-{config_dict['model']}.pt"
-    
+        
     return config_dict
    
     
@@ -244,10 +250,23 @@ if __name__ == "__main__":
     configs = main()
     print(configs)
     mop = MoP(configs)
-    if not configs['create_partition']:
+    if not configs['create_partition'] and not configs['load_pruned_model']:
         mop.prune()
         mop.finetune()
-    
+    elif configs['load_pruned_model']:
+        # Run accuracy test
+        # Run timing test
+        # pruned model file is: configs['load_pruned_model_file']
+        model = get_model_from_code(configs).to(configs['device'])
+        state_dict = torch.load(get_model_path_split("{}".format(configs["load_pruned_model_file"])), map_location=configs['device'])
+        model = load_state_dict(model, 
+                                        state_dict['model_state_dict'] if 'model_state_dict' in state_dict 
+                                        else state_dict['state_dict'] if 'state_dict' in state_dict else state_dict,)
+
+        
+           
+
+
+
     # mop.pruneMask()
     # mop.finetuneWeight()
-   

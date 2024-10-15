@@ -1,4 +1,4 @@
-device: cuda:2
+device: cuda:0
 # model: wrn28_10
 model: resnet101
 data_code: cifar100
@@ -12,7 +12,7 @@ learning_rate: 0.01
 seed: 1234
 
 sparsity_type: kernel
-prune_ratio: 0.8
+prune_ratio: 0.5
 admm: True
 admm_epochs: 300
 rho: 0.0001
@@ -42,4 +42,5 @@ comm_outsize: True
 lambda_comm: 0.0001
 lambda_comp: 0
 create_partition: False
-load_model: True
+load_dense_model: True
+load_pruned_model: False

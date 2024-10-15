@@ -34,7 +34,7 @@ class BasicBlock(nn.Module):
 class ResLike(nn.Module):
     def __init__(self, block, num_classes=10):
         super(ResLike, self).__init__()
-        self.conv1 = nn.Conv2d(15, 32, kernel_size=7, padding="same", bias=False)
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=7, padding="same", bias=False)
         self.conv2 = nn.Conv2d(32, 32, kernel_size=3, padding="same", bias=False)
         self.layer1 = nn.Sequential(block(32, 32, pool_kernel=2))
         self.layer2 = nn.Sequential(block(32, 32, pool_kernel=2))

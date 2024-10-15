@@ -1,23 +1,23 @@
-device: cuda:1
+device: cuda:2
 model: EscFusion
 data_code: esc
 num_classes: 2
 
-epochs: 10
+epochs: 300
 batch_size: 32
 optimizer: adam
 lr_scheduler: cosine
-learning_rate: 0.01
+learning_rate: 0.0001
 seed: 1234
 
 sparsity_type: kernel
-prune_ratio: 0.8
+prune_ratio: 0.75
 admm: True
 admm_epochs: 300
 rho: 0.01
 multi_rho: True
 retrain_bs: 128
-retrain_lr: 0.001
+retrain_lr: 0.00001
 retrain_ep: 100
 retrain_opt: adam
 
@@ -32,7 +32,7 @@ smooth :  False
 smooth_eps :  0
 save_last_model_only: False
 
-num_partition: 4
+num_partition: 16
 layer_type: regular
 bn_type: regular
 
@@ -41,4 +41,5 @@ comm_outsize: True
 lambda_comm: 1000
 lambda_comp: 0
 create_partition: False
-load_model: True
+load_dense_model: True
+load_pruned_model: False

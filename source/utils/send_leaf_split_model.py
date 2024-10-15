@@ -21,7 +21,10 @@ def prep_data(tensor):
 def main():
     parser = argparse.ArgumentParser(description="Leaf node data collector and sender.")
     parser.add_argument("config_file", type=str, help="Path to the configuration file.")
+    parser.add_argument('-b', '--batch_size', type=int, help='Expected batch size of inputs', default=16)
     args = parser.parse_args()
+
+    batch_size =  args.batch_size
 
     # Load configuration
     with open(args.config_file, "r") as f:
@@ -30,7 +33,7 @@ def main():
     servers = [(srv['ip'], srv['port']) for srv in config['servers']]
     send_data = [srv['data'] == 'True' for srv in config['servers']]
 
-    tensor = torch.rand((1,3,32,32)) # single image from cifar 
+    tensor = torch.rand((batch_size,3,32,32)) # single image from cifar 
 
     # 3 send each server different data 
     for iserver in range(len(servers)):
