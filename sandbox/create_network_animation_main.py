@@ -8,8 +8,8 @@ import matplotlib.lines as mlines
 import yaml
 
 path = os.path.join('logs', 'logs_colosseum')
-# model_name = 'esc-EscFusion-kernel-np4-pr0.5-lcm100'
-model_name = 'esc-EscFusion-kernel-np4-pr0.85-lcm100'
+model_name = 'esc-EscFusion-kernel-np4-pr0.5-lcm100'
+# model_name = 'esc-EscFusion-kernel-np4-pr0.85-lcm100'
 # model_name = 'cifar100-resnet101-kernel-np4-pr0.5-lcm1e-04-batch16'
 
 path_partition_file = os.path.join('config', 'EscFusion-np4.yaml')
@@ -19,10 +19,10 @@ with open(path_partition_file, 'r') as stream:
     except yaml.YAMLError as exc:
         print(exc)
 
-partition_list = list(partition['partition'].keys())
+partition_list = list(partition['partitions'].keys())
 partition_list = partition_list + ['out']
 
-scaling = 100
+scaling = 10
 node_size = 4000
 edge_width = 3
 
@@ -30,7 +30,7 @@ model_path = os.path.join(path, model_name)
 df = pd.read_csv(os.path.join(model_path, 'block_events.csv'))
 
 # Round up the max time to the nearest second
-max_time = round((df['time'].max())/scaling) + 4
+max_time = round((df['time'].max())/scaling) + 100
 # df['timestamp'] = pd.to_datetime(df['timestamp'])
 
 # Create a NetworkX graph
@@ -62,8 +62,8 @@ ax.axis('off')  # Hide axes
 labels = {node: f'SRN {node}' for node in G.nodes}
 nx.draw_networkx_labels(G, positions, labels=labels, font_color='black')
 
-network_ax = fig.add_axes([0.1, 0.3, 0.8, 0.65])  # Main plot
-# bar_ax = fig.add_axes([0.1, 0.15, 0.8, 0.05])  # Progress bar
+# network_ax = fig.add_axes([0.1, 0.3, 0.8, 0.65])  # Main plot
+network_ax = ax
 
 # Create legend handles for nodes and edges
 node_idle = mlines.Line2D([], [], color='gray', marker='o', linestyle='None', markersize=10, label='Idle (Node)')
@@ -118,7 +118,7 @@ def update(frame):
                     network_ax.text(positions[current_node][0], positions[current_node][1] + 0.2, row['layer_name'], 
                             fontsize=10, ha='center', color='black')
                     
-            if done_executing[current_node]:
+            elif done_executing[current_node]:
                 progress_data[current_node] += 1
                 done_executing[current_node] = False
 
@@ -129,10 +129,41 @@ def update(frame):
 
     network_ax.legend(handles=[node_idle, node_send, node_execute, edge_idle, edge_send, edge_execute], loc='upper right')
 
-    # Add progress bar text
-    progress = (frame / max_time) * 100  # Calculate progress percentage
-    network_ax.text(0, -2, f'Progress: {progress:.1f}%', fontsize=12, ha='center', va='center', color='black')
+    # Draw progress bars for each node
+    # for node in positions.keys():
+    #     bar_ax = fig.add_axes([positions[node][0] - 0.5, positions[node][1] - 0.3, 1, 0.05])
+    #     bar_length = (progress_data[node] / len(partition_list)) * 100
+    #     y_pos = 0  # Center the bars
+    #     bar_ax.barh(y_pos, bar_length, height=0.2, color='blue', edgecolor='black', align='center')
+    #     bar_ax.set_xlim(0, 100)  # Set x-limits for the bar
+    #     bar_ax.set_ylim(-0.5, 0.5)  # Set y-limits for the bar
+    #     bar_ax.axis('off')  # Hide the bar axes
 
+    # for node in positions.keys():
+    #     if node == 0:
+    #         pos = (positions[node][0] - 0.5, positions[node][1])
+    #     elif node == 1:
+    #         pos = (positions[node][0], positions[node][1] + 0.5)
+    #     elif node == 2:
+    #         pos = (positions[node][0] + 0.5, positions[node][1])
+    #     elif node == 3:
+    #         pos = (positions[node][0], positions[node][1] - 0.5)
+        
+    #     bar_ax = fig.add_axes([pos[0] - 0.5, pos[1] - 0.2, 1, 0.05])
+    #     bar_length = (progress_data[node] / len(partition_list)) * 100
+    #     y_pos = pos[1]
+    #     bar_ax.barh(y_pos, bar_length, height=0.2, color='blue', edgecolor='black', align='center')
+
+        
+        # bar_ax = fig.add_axes([0.1, 0.15, 0.8, 0.05])  # Progress bar
+        # # bar_ax = fig.add_axes([positions[node][0] - 0.5, positions[node][1] - 0.2, 1, 0.05])
+        # bar_length = (progress_data[node] / len(partition_list)) * 100
+        # y_pos = positions[node][1] - 2
+        # bar_ax.barh(y_pos, bar_length, height=0.2, color='blue', edgecolor='black', align='center')
+    
+    # bar_ax.set_xlim(0, 100)
+    # bar_ax.set_ylim(-1.5, 1.5)
+    
 
 # Create the animation
 ani = animation.FuncAnimation(fig, update, frames=max_time, interval=1000, repeat=True)
@@ -140,6 +171,6 @@ ani = animation.FuncAnimation(fig, update, frames=max_time, interval=1000, repea
 # Save the animation
 plt.axis('off')
 
-ani.save(f'{model_name}.mp4', writer='ffmpeg', fps=3)
+ani.save(f'{model_name}_main.mp4', writer='ffmpeg', fps=100, dpi=300)
 
 plt.close(fig)
