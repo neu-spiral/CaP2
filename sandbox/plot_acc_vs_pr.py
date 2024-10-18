@@ -165,7 +165,7 @@ def animate_all_models():
                         blit=True, repeat=False, interval=300)
 
     # Save the animation
-    ani.save('combined_model_animation.mp4', writer='ffmpeg', fps=30)
+    ani.save('assets/figs/combined_model_animation.mp4', writer='ffmpeg', dpi=150, fps=30)
     plt.close(fig)
 
 # Animate and save the plot with all models

@@ -10,7 +10,7 @@ import numpy as np
 
 path = os.path.join('logs', 'demo_logs')
 
-model_name = 'cifar100-resnet101-run1.1'
+# model_name = 'cifar100-resnet101-run1.1'
 # model_name = 'cifar100-resnet101-kernel-np4-pr0.5-lcm1e-05-run1'
 # model_name = 'cifar100-resnet101-kernel-np4-pr0.75-lcm1e-05-run1'
 model_name = 'cifar100-resnet101-kernel-np4-pr0.85-lcm1e-05-run1'
@@ -33,7 +33,7 @@ partition_list = partition_list + ['out']
 partition_list_0 = partition_list.copy()
 partition_list_0.remove('conv1.weight')
 
-checkmark_image = plt.imread('sandbox/checkmark.png')
+# checkmark_image = plt.imread('sandbox/checkmark.png')
 
 slowing_factor = 10
 
@@ -51,7 +51,7 @@ df = pd.read_csv(os.path.join(model_path, 'block_events.csv'))
 max_bytes_sent = df['bytes_tx'].max()
 
 # Round up the max time to the nearest second
-max_time = round((df['time'].max())/scaling) + int(fps) + 10
+max_time = round((df['time'].max())/scaling) + int(fps) + 100
 # df['timestamp'] = pd.to_datetime(df['timestamp'])
 
 # Create a NetworkX graph
@@ -283,6 +283,6 @@ ani = animation.FuncAnimation(fig, update, frames=max_time, interval=interval, r
 plt.axis('off')
 # plt.tight_layout()
 
-ani.save(f'{model_name}_with_progress_scale{scaling}.mp4', writer='ffmpeg', fps=fps, dpi=150)
+ani.save(f'assets/figs/{model_name}_with_progress_scale{scaling}.mp4', writer='ffmpeg', fps=fps, dpi=150)
 
 plt.close(fig)
