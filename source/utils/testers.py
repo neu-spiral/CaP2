@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from numpy import linalg as LA
+import cv2
 
 from .masks import *
 from PIL import Image,ImageOps,ImageColor
@@ -387,6 +388,7 @@ def plot_layer(model, partition, layer_id=(1,), savepath=''):
                     img_prev = img
     
     img.save(savepath+'.png')
+    # cv2.imwrite(savepath+'.jpg', np.array(img))
                 
 
 def test_filter_balance(model):

@@ -236,6 +236,9 @@ def main():
     if 'smooth_eps' not in config_dict and args.smooth_eps:
         config_dict['smooth_eps'] = 0 
 
+    if config_dict['lambda_comm'] >= 1:
+        config_dict['lambda_comm'] = int(config_dict['lambda_comm'])
+
     config_dict['load_pruned_model_file'] = f"{config_dict['data_code']}-{config_dict['model']}-{config_dict['sparsity_type']}-np{config_dict['num_partition']}-pr{config_dict['prune_ratio']}-lcm{config_dict['lambda_comm']}.pt"
     config_dict['partition_path'] = f"config/{config_dict['model']}-np{config_dict['num_partition']}.yaml"
     config_dict['load_dense_model_file'] = f"{config_dict['data_code']}-{config_dict['model']}.pt"
@@ -251,6 +254,7 @@ if __name__ == "__main__":
     print(configs)
     mop = MoP(configs)
     if not configs['create_partition'] and not configs['load_pruned_model']:
+        configs['plot'] = False
         mop.prune()
         mop.finetune()
     elif configs['load_pruned_model']:

@@ -91,31 +91,38 @@ class MoP:
             #            savepath=get_fig_path("{}".format('.'.join(configs["load_model_file"].split('.')[:-1]))))
             
     def prune(self):
-        nepoch = self.configs['epochs']
-        criterion, optimizer, scheduler = set_optimizer(self.configs, self.model, self.train_loader, \
-                                             self.configs['optimizer'], self.configs['learning_rate'], nepoch)
-        
-        # Initializing ADMM; if not admm, do hard pruning only
-        admm = ADMM(self.configs, self.model, rho=self.configs['rho']) if self.configs['admm'] else None
-
-        # prune
-        for cepoch in range(0, nepoch+1):
-            if cepoch>0:
-                print('Learning rate: {:.4f}'.format(get_lr(optimizer)))
-                standard_train(self.configs, cepoch, self.model, self.train_loader, 
-                               criterion, optimizer, scheduler, ADMM=admm, comm=True)
-            acc = self.test_model(self.model, criterion, cepoch)
+        if not self.configs['plot']:
+            nepoch = self.configs['epochs']
+            criterion, optimizer, scheduler = set_optimizer(self.configs, self.model, self.train_loader, \
+                                                self.configs['optimizer'], self.configs['learning_rate'], nepoch)
             
-        # hard prune
-        hard_prune(admm, self.model, self.configs['sparsity_type'], option=None)
+            # Initializing ADMM; if not admm, do hard pruning only
+            admm = ADMM(self.configs, self.model, rho=self.configs['rho']) if self.configs['admm'] else None
+
+            # prune
+            for cepoch in range(0, nepoch+1):
+                if cepoch>0:
+                    print('Learning rate: {:.4f}'.format(get_lr(optimizer)))
+                    standard_train(self.configs, cepoch, self.model, self.train_loader, 
+                                criterion, optimizer, scheduler, ADMM=admm, comm=True)
+                acc = self.test_model(self.model, criterion, cepoch)
+                
+            # hard prune
+            hard_prune(admm, self.model, self.configs['sparsity_type'], option=None)
+            
+            # test sparsity
+            test_kernel_sparsity(self.model, partition=self.configs['partition'])
+            test_partition(self.model, partition=self.configs['partition'])
         
-        # test sparsity
-        test_kernel_sparsity(self.model, partition=self.configs['partition'])
-        test_partition(self.model, partition=self.configs['partition'])
-        
-        # plot first conv layer
-        #plot_layer(self.model, self.configs['partition'], layer_id=(1,5,10,),
-        #           savepath=get_fig_path("{}".format('.'.join(self.model_file.split('.')[:-1]))))
+        else:
+            self.model = get_model_from_code(self.configs).to(self.configs['device'])
+            state_dict = torch.load(get_model_path_split("{}".format(self.configs["load_pruned_model_file"])), map_location=self.configs['device'])
+            self.model = load_state_dict(self.model, 
+                                            state_dict['model_state_dict'] if 'model_state_dict' in state_dict 
+                                            else state_dict['state_dict'] if 'state_dict' in state_dict else state_dict,)
+            # plot first conv layer
+            plot_layer(self.model, self.configs['partition'], layer_id=(5,),
+                    savepath=get_fig_path("{}".format('.'.join(self.model_file.split('.')[:-1]))))
         #save_model(self.model, get_model_path("{}.pt".format('.'.join(self.model_file.split('.')[:-1])+'_hardprune')))
                 
     def finetune(self):
@@ -130,34 +137,36 @@ class MoP:
         #                                #bn_par=True, 
         #                                #partition=self.configs['partition']
         #                                )
+        if not self.configs['plot']:
+            print("======== MODEL INFO =========")
+            print(self.model)
+            print("=" * 40)
+            calflops(self.model, self.input_var, self.configs['prune_ratio'])
+            
+            # get mask
+            masks = get_model_mask(model=self.model)
         
-        print("======== MODEL INFO =========")
-        print(self.model)
-        print("=" * 40)
-        calflops(self.model, self.input_var, self.configs['prune_ratio'])
+            # masked retrain
+            nepoch = self.configs['retrain_ep']
+            criterion, optimizer, scheduler = set_optimizer(self.configs, self.model, self.train_loader, \
+                                                self.configs['retrain_opt'], self.configs['retrain_lr'], nepoch)
         
-        # get mask
-        masks = get_model_mask(model=self.model)
-    
-        # masked retrain
-        nepoch = self.configs['retrain_ep']
-        criterion, optimizer, scheduler = set_optimizer(self.configs, self.model, self.train_loader, \
-                                             self.configs['retrain_opt'], self.configs['retrain_lr'], nepoch)
-    
-        best = 0
-        for cepoch in range(0, nepoch+1):
-            if cepoch>0:
-                print('Learning rate: {:.4f}'.format(get_lr(optimizer)))
-                standard_train(self.configs, cepoch, self.model, self.train_loader, 
-                               criterion, optimizer, scheduler, masks=masks)
-            acc = self.test_model(self.model, criterion, cepoch)
-            if acc > best:
-                best = acc
-                save_model(self.model, get_model_path("{}".format(self.model_file)))
-                print('Save model')
-        
-        test_kernel_sparsity(self.model, partition=self.configs['partition'])
-        test_partition(self.model, partition=self.configs['partition'])
+            best = 0
+            for cepoch in range(0, nepoch+1):
+                if cepoch>0:
+                    print('Learning rate: {:.4f}'.format(get_lr(optimizer)))
+                    standard_train(self.configs, cepoch, self.model, self.train_loader, 
+                                criterion, optimizer, scheduler, masks=masks)
+                acc = self.test_model(self.model, criterion, cepoch)
+                if acc > best:
+                    best = acc
+                    save_model(self.model, get_model_path("{}".format(self.model_file)))
+                    print('Save model')
+            
+            test_kernel_sparsity(self.model, partition=self.configs['partition'])
+            test_partition(self.model, partition=self.configs['partition'])
+        else:
+            pass
     
     def pruneMask(self):
         nepoch = self.configs['epochs']
