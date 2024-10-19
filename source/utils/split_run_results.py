@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 import numpy as np
 import os
 
+from source.utils import misc
+
 def parse_log_file(log_file_path):
     ''' 
         Regular expressions to capture the timestamp and data from each log message type AND
@@ -15,6 +17,9 @@ def parse_log_file(log_file_path):
             layer_event_df - tracks timestamps for when each layer in the model finishes and the FLPOS computed 
             total_runtime - array with total runtimes in seconds
     '''
+
+    # debug... looking for empty events
+    print(f'\t {log_file_path}')
 
     timestamp_regex = r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})"
 
@@ -145,21 +150,33 @@ def parse_log_file(log_file_path):
     idle_time_df['timestamp'] = pd.to_datetime(idle_time_df['timestamp'], format=time_format_str)
     execute_layer_ts_df['timestamp'] = pd.to_datetime(execute_layer_ts_df['timestamp'], format=time_format_str)
     execute_layers_df['timestamp'] = pd.to_datetime(execute_layers_df['timestamp'], format=time_format_str)
-    send_data_df['timestamp'] = pd.to_datetime(send_data_df['timestamp'],format=time_format_str)
     total_send_data_df['timestamp'] = pd.to_datetime(total_send_data_df['timestamp'],format=time_format_str)
     prep_out_df['timestamp'] = pd.to_datetime(prep_out_df['timestamp'],format=time_format_str)
     received_layer_df['timestamp'] = pd.to_datetime(received_layer_df['timestamp'], format=time_format_str)
     flops_df['timestamp'] = pd.to_datetime(flops_df['timestamp'], format=time_format_str)
 
+    # handle send data first because i might be empty 
+    if len(send_data_df) > 0:
+        send_data_df['timestamp'] = pd.to_datetime(send_data_df['timestamp'],format=time_format_str)
+
+        # include send data when looking for first event timestamp 
+        start_date = min(pd.concat([idle_time_df['timestamp'], execute_layer_ts_df['timestamp'],  execute_layers_df['timestamp'], send_data_df['timestamp'], total_send_data_df['timestamp'], received_layer_df['timestamp']]))
+
+        send_data_df['time'] = (send_data_df['timestamp']-start_date).dt.total_seconds()*1e3
+        
+    else:
+        # send df is empty, dont need to compute 
+
+        # exclude send data when looking for first event timestamp 
+        start_date = min(pd.concat([idle_time_df['timestamp'], execute_layer_ts_df['timestamp'],  execute_layers_df['timestamp'], total_send_data_df['timestamp'], received_layer_df['timestamp']]))
+
     # zero to 1st entry across all messages TODO: use starting model debug message as reference 
-    start_date = min(pd.concat([idle_time_df['timestamp'], execute_layer_ts_df['timestamp'],  execute_layers_df['timestamp'], send_data_df['timestamp'], total_send_data_df['timestamp'], received_layer_df['timestamp']]))
     idle_time_df['time'] = (idle_time_df['timestamp'] -start_date).dt.total_seconds()*1e3
     execute_layer_ts_df['time'] = (execute_layer_ts_df['timestamp'] - start_date).dt.total_seconds()*1e3
     execute_layers_df['time'] = (execute_layers_df['timestamp']-start_date).dt.total_seconds()*1e3
-    send_data_df['time'] = (send_data_df['timestamp']-start_date).dt.total_seconds()*1e3
-    total_send_data_df['time'] = (total_send_data_df['timestamp']-start_date).dt.total_seconds()*1e3
     prep_out_df['time'] = (prep_out_df['timestamp']-start_date).dt.total_seconds()*1e3
     received_layer_df['time'] = (received_layer_df['timestamp']-start_date).dt.total_seconds()*1e3
+    total_send_data_df['time'] = (total_send_data_df['timestamp']-start_date).dt.total_seconds()*1e3
 
     # make uniform formating to prepare for merge
     # - each row is an event
@@ -167,9 +184,10 @@ def parse_log_file(log_file_path):
     # - each event has 4 base cols: timestamp [ms], type [idle/tx/rx/prep], layer (event operates on this layer), dur [ms], 
 
     def adjust_df(df, type):
-        df['type'] = type
-        df['timestamp'] = df['timestamp'] - pd.to_timedelta(df['dur'], unit='ms')
-        df['time'] = df['time'] - df['dur']
+        if len(df) > 0:
+            df['type'] = type
+            df['timestamp'] = df['timestamp'] - pd.to_timedelta(df['dur'], unit='ms')
+            df['time'] = df['time'] - df['dur']
         return df
 
     idle_time_df = adjust_df(idle_time_df, 'idle')
@@ -253,8 +271,18 @@ def combine_log_files(log_file_path, log_name_substr, num_nodes):
 
         total_runtime.append(total_runtime_tmp)
 
+        # add node number
         block_event_tmp['node'] = i
         layer_event_tmp['node'] = i
+
+        # add run str 
+        if '\\' in log_file_path:
+            run_name = log_file_path.split('\\')[-1]
+        else:
+            run_name = log_file_path.split('\\')[-1]
+        run_str = misc.parse_filename(run_name)['run']
+        block_event_tmp['run'] = run_str
+        layer_event_tmp['run'] = run_str
 
         if i ==0:
             block_event_df = block_event_tmp
@@ -274,8 +302,12 @@ def combine_log_files(log_file_path, log_name_substr, num_nodes):
     #master_df[key] = master_df[key].fillna(0)
 
     # rearrange columns 
-    block_event_df = block_event_df[['timestamp', 'time', 'node', 'layer', 'layer_name','type', 'dur', 'process_dur', 'bytes_tx', 'serialize_dur', 'encode_dur_tx','ip', 'port', 'bytes_rx', 'deserialize_time']]
-    layer_event_df = layer_event_df[['timestamp', 'time', 'node', 'layer', 'layer_name', 'FLOPS', 'parameters']]
+    if 'run' in block_event_df.columns:
+        block_event_df = block_event_df[['timestamp', 'time', 'node', 'layer', 'layer_name','type', 'dur', 'process_dur', 'bytes_tx', 'serialize_dur', 'encode_dur_tx','ip', 'port', 'bytes_rx', 'deserialize_time', 'run']]
+        layer_event_df = layer_event_df[['timestamp', 'time', 'node', 'layer', 'layer_name', 'FLOPS', 'parameters', 'run']]
+    else:   
+        block_event_df = block_event_df[['timestamp', 'time', 'node', 'layer', 'layer_name','type', 'dur', 'process_dur', 'bytes_tx', 'serialize_dur', 'encode_dur_tx','ip', 'port', 'bytes_rx', 'deserialize_time']]
+        layer_event_df = layer_event_df[['timestamp', 'time', 'node', 'layer', 'layer_name', 'FLOPS', 'parameters']]
 
     # Save DataFrames to CSV 
     block_event_df.to_csv(os.path.join(log_file_path,'block_events.csv'), index=False)

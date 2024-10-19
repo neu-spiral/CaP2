@@ -11,8 +11,8 @@
 rf_flag=false
 
 node_file="nodes.txt"
-model_file="cifar10-resnet18-kernel-np4-pr0.5-lcm0.0001"
-leaf_connection_type='wifi' # CHANGE ME
+model_file="cifar100-resnet101-kernel-np4-pr0.85-lcm1e-05"
+leaf_connection_type='server' # CHANGE ME
 
 # TODO: remove hardcoded params for 2nd half
 final_node=1
@@ -58,7 +58,7 @@ for ((i=1; i<=num_lines; i++)); do
 
       # Sync local repo with the remote
       echo "Syncing local repo with $prefixed_number"
-      sshpass -p "scope" rsync -avz --exclude='.git' --exclude='assets/' ../../CaP/ $prefixed_number:/root/CaP/
+      sshpass -p "scope" rsync -avz --exclude='.git' --exclude='assets/' --exclude='logs/' --exclude='local_logs/' ../../CaP/ $prefixed_number:/root/CaP/
       sleep 1
 
       # Copy model to network node      
@@ -86,7 +86,7 @@ for ((i=1; i<=num_lines; i++)); do
 
       # Sync local repo with the remote
       echo "Syncing local repo with $prefixed_number"
-      sshpass -p "sunflower" rsync -avz --exclude='.git' --exclude='assets/'  ../../CaP/ $prefixed_number:/root/CaP/
+      sshpass -p "sunflower" rsync -avz --exclude='.git' --exclude='assets/' --exclude='logs/' --exclude='local_logs/'  ../../CaP/ $prefixed_number:/root/CaP/
       sleep 1
 
       # Copy model to network node      
@@ -103,7 +103,7 @@ for ((i=1; i<=num_lines; i++)); do
 
       # Sync local networks-for-ai directory with the remote
       echo "Syncing local repo with $prefixed_number"
-      sshpass -p "ChangeMe" rsync -avz --exclude='.git' --exclude='assets/' ../../CaP/ $prefixed_number:/root/CaP/
+      sshpass -p "ChangeMe" rsync -avz --exclude='.git' --exclude='assets/' --exclude='logs/' --exclude='local_logs/' ../../CaP/ $prefixed_number:/root/CaP/
       sleep 1
 
       # Copy model to network node      
