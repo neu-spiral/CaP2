@@ -93,9 +93,9 @@ ax_icon = plt.axes([0, 0, 2, 2])
 # Create legend handles for nodes and edges
 node_idle = mlines.Line2D([], [], color='gray', marker='o', linestyle='None', markersize=12, label='Idle (Node)')
 node_send = mlines.Line2D([], [], color='orange', marker='o', linestyle='None', markersize=12, label='Communicate (Node)')
-node_execute = mlines.Line2D([], [], color='lightblue', marker='o', linestyle='None', markersize=12, label='Execute (Node)')
+node_execute = mlines.Line2D([], [], color='lightblue', marker='o', linestyle='None', markersize=12, label='Compute (Node)')
 edge_idle = mlines.Line2D([], [], color='gray', linewidth=2, marker='', linestyle='-', markersize=12, label='Idle (Edge)')
-edge_send = mlines.Line2D([], [], color='orange', linewidth=2, marker='>', linestyle='-', markersize=12, label='Send (Edge)')
+edge_send = mlines.Line2D([], [], color='orange', linewidth=2, marker='>', linestyle='-', markersize=12, label='Communicate (Edge)')
 
 # Add legend to the plot
 # network_ax.legend(handles=[node_idle, node_send, node_execute, edge_idle, edge_send], loc='upper right', fontsize=40)
@@ -105,8 +105,8 @@ progress_data = {node: [] for node in positions.keys()}
 done_executing = {node: False for node in positions.keys()}
 done_executing_frame = {node: 0 for node in positions.keys()}
 
-done_executing[5] = False
-done_executing_frame[5] = 0
+done_executing[4] = False
+done_executing_frame[4] = 0
 
 
 def update(frame):
@@ -170,7 +170,7 @@ def update(frame):
     network_ax.legend(handles=[node_idle, node_send, node_execute, edge_idle, edge_send], loc='upper right', fontsize=14)
 
     bar_ax.clear()
-    bar_ax.set_title('Execution Progress of Model Layers', fontsize=22, fontweight='bold')
+    bar_ax.set_title('Computation Progress of Model Layers', fontsize=22, fontweight='bold')
     bar_ax.set_xlim(0, 100)
     bar_ax.set_ylim(-0.5, len(positions) - 0.5)
     # bar_ax.barh(list(positions.keys()), [progress_data[node] / len(partition_list) * 100 for node in positions.keys()], color='lightblue')
@@ -202,7 +202,7 @@ def update(frame):
     if len(progress_data[0]) >= len(partition_list_0):
         done_executing[0] = True
         network_ax.text(positions[0][0], positions[0][1] - 0.3, 'Inference Time:', fontsize=20, ha='center', color='black', fontweight='bold')
-        network_ax.text(positions[0][0], positions[0][1] - 0.3 - 0.1, f'{done_executing_frame[0]/fps} s', fontsize=20, ha='center', color='black', fontweight='bold')
+        network_ax.text(positions[0][0], positions[0][1] - 0.3 - 0.1, f'{round(done_executing_frame[0]/(fps*slowing_factor), 2)} s', fontsize=20, ha='center', color='black', fontweight='bold')
         # network_ax.text(positions[0][0] - 0.3, positions[0][1] - 0.05, '\u2713', fontsize=60, color='#009E73', ha='center', fontweight='bold')
         bar_ax.text(105, + 0.3, '\u2713', fontsize=60, color='#009E73', ha='center', fontweight='bold')
         # network_ax.imshow(checkmark_image, extent=[positions[0][0], positions[0][0] + image_width, node - image_height / 2, node + image_height / 2], aspect='auto')
@@ -212,7 +212,7 @@ def update(frame):
     if len(progress_data[1]) >= len(partition_list):
         done_executing[1] = True
         network_ax.text(positions[1][0] - 0.7, positions[1][1], 'Inference Time:', fontsize=20, ha='center', color='black', fontweight='bold')
-        network_ax.text(positions[1][0] - 0.7, positions[1][1] - 0.1, f'{done_executing_frame[1]/fps} s', fontsize=20, ha='center', color='black', fontweight='bold')
+        network_ax.text(positions[1][0] - 0.7, positions[1][1] - 0.1, f'{round(done_executing_frame[1]/(fps*slowing_factor), 2)} s', fontsize=20, ha='center', color='black', fontweight='bold')
         # network_ax.text(positions[1][0], positions[1][1] + 0.15, '\u2713', fontsize=60, color='#009E73', ha='center', fontweight='bold')
         bar_ax.text(105, 1 + 0.3, '\u2713', fontsize=60, color='#009E73', ha='center', fontweight='bold')
         # network_ax.imshow(checkmark_image, extent=[positions[1][0], positions[1][0] + image_width, node - image_height / 2, node + image_height / 2], aspect='auto')
@@ -222,7 +222,7 @@ def update(frame):
     if len(progress_data[2]) >= len(partition_list):
         done_executing[2] = True
         network_ax.text(positions[2][0], positions[2][1] - 0.3, 'Inference Time:', fontsize=20, ha='center', color='black', fontweight='bold')
-        network_ax.text(positions[2][0], positions[2][1] - 0.3 - 0.1, f'{done_executing_frame[2]/fps} s', fontsize=20, ha='center', color='black', fontweight='bold')
+        network_ax.text(positions[2][0], positions[2][1] - 0.3 - 0.1, f'{round(done_executing_frame[2]/(fps*slowing_factor), 2)} s', fontsize=20, ha='center', color='black', fontweight='bold')
         # network_ax.text(positions[2][0] + 0.3, positions[2][1] - 0.05, '\u2713', fontsize=60, color='#009E73', ha='center', fontweight='bold')
         bar_ax.text(105, 2 + 0.3, '\u2713', fontsize=60, color='#009E73', ha='center', fontweight='bold')
         # network_ax.imshow(checkmark_image, extent=[positions[2][0], positions[2][0] + image_width, node - image_height / 2, node + image_height / 2], aspect='auto')
@@ -232,7 +232,7 @@ def update(frame):
     if len(progress_data[3]) >= len(partition_list):
         done_executing[3] = True
         network_ax.text(positions[3][0] + 0.7, positions[3][1], 'Inference Time:', fontsize=20, ha='center', color='black', fontweight='bold')
-        network_ax.text(positions[3][0] + 0.7, positions[3][1] - 0.1, f'{done_executing_frame[3]/fps} s', fontsize=20, ha='center', color='black', fontweight='bold')
+        network_ax.text(positions[3][0] + 0.7, positions[3][1] - 0.1, f'{round(done_executing_frame[3]/(fps*slowing_factor), 2)} s', fontsize=20, ha='center', color='black', fontweight='bold')
         # network_ax.text(positions[3][0] - 0.3, positions[3][1] - 0.05, '\u2713', fontsize=60, color='#009E73', ha='center', fontweight='bold')
         bar_ax.text(105, 3 + 0.3, '\u2713', fontsize=60, color='#009E73', ha='center', fontweight='bold')
         # network_ax.imshow(checkmark_image, extent=[positions[3][0], positions[3][0] + image_width, node - image_height / 2, node + image_height / 2], aspect='auto')
@@ -243,17 +243,21 @@ def update(frame):
         # bar_ax.imshow(checkmark_image, extent=[90, 90 + image_width, 0 - image_height / 2, 0 + image_height / 2], aspect='auto')
         # bar_ax.imshow(checkmark_image, extent=[100, 100 + image_width*4, 0 - image_height / 2, 0 + image_height / 2], aspect='auto')
         # network_ax.imshow(checkmark_image, extent=[0, 0 + image_width, 0 - image_height / 2, 0 + image_height / 2])
-    if not done_executing[5]:
-        done_executing_frame[5] += 1
+    if not done_executing[4]:
+        done_executing_frame[4] += 1
 
 
     # Overall Inference Time
 
     if len(progress_data[0]) >= len(partition_list_0) and len(progress_data[1]) >= len(partition_list) and len(progress_data[2]) >= len(partition_list) and len(progress_data[3]) >= len(partition_list):
-        done_executing[5] = True
+        done_executing[4] = True
         network_ax.text(0, 1.5, 'Overall Inference Time:', fontsize=30, ha='center', color='black', fontweight='bold')
-        network_ax.text(0, 1.5 -0.15, f'{done_executing_frame[5]/fps} s', fontsize=30, ha='center', color='black', fontweight='bold')
-        network_ax.text(0, - 0.1, '\u2713', fontsize=150, color='#009E73', ha='center', fontweight='bold')
+        network_ax.text(0, 1.5 -0.15, f'{round(done_executing_frame[4]/(fps*slowing_factor), 2)} s', fontsize=30, ha='center', color='black', fontweight='bold')
+        # network_ax.text(0, - 0.1, '\u2713', fontsize=150, color='#009E73', ha='center', fontweight='bold')
+        # put the checkmark on left and right of the text
+        network_ax.text(-1.15, 1.2, '\u2713', fontsize=150, color='#009E73', ha='center', fontweight='bold')
+        network_ax.text(1.15, 1.2, '\u2713', fontsize=150, color='#009E73', ha='center', fontweight='bold')
+
         # put the checkmark on left and right of the text
         # network_ax.imshow(checkmark_image, extent=[-1.5, -1.3, 1.5, 1.3])
         # network_ax.imshow(checkmark_image, extent=[1.3, 1.5, 1.5, 1.3])
@@ -270,9 +274,9 @@ def update(frame):
 
     # # Update the overall inference time display
     # if all(done_executing[node] for node in positions.keys()):
-    #     done_executing[5] = True
+    #     done_executing[4] = True
     #     network_ax.text(0, 1.5, 'Overall Inference Time:', fontsize=30, ha='center', color='black', fontweight='bold')
-    #     network_ax.text(0, 1.35, f'{done_executing_frame[5] / fps:.2f} s', fontsize=30, ha='center', color='black', fontweight='bold')
+    #     network_ax.text(0, 1.35, f'{done_executing_frame[4] / fps:.2f} s', fontsize=30, ha='center', color='black', fontweight='bold')
 
 
 

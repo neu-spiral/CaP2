@@ -10,6 +10,8 @@ from .admm import *
 import time
 from torch.autograd import Variable
 from torchsummary import summary
+from torchviz import make_dot
+import torch.onnx
 
 class MoP:
     """
@@ -120,6 +122,15 @@ class MoP:
             self.model = load_state_dict(self.model, 
                                             state_dict['model_state_dict'] if 'model_state_dict' in state_dict 
                                             else state_dict['state_dict'] if 'state_dict' in state_dict else state_dict,)
+            
+
+
+            # dot = make_dot(self.model(self.input_var), params=dict(self.model.named_parameters()))
+            # dot.format = 'png'
+            # dot.render(get_fig_path("{}".format('.'.join(self.model_file.split('.')[:-1]))))
+
+            torch.onnx.export(self.model, self.input_var, get_fig_path("{}".format('.'.join(self.model_file.split('.')[:-1]))+'.onnx'))
+
             # plot first conv layer
             plot_layer(self.model, self.configs['partition'], layer_id=(5,),
                     savepath=get_fig_path("{}".format('.'.join(self.model_file.split('.')[:-1]))))

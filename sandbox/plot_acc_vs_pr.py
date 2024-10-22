@@ -84,7 +84,8 @@ import numpy as np
 pr = [0, 0.5, 0.7, 0.75, 0.8, 0.85, 0.95]
 resnet18 = [93.83, 91.56, 91.45, 89.19, 89.71, 89.73, 85.29]
 resnet101 = [71.62, 71.56, 71.31, 68.62, 68.55, 67.70, 53.16]
-esc = [99.89, 98.89, 99.16, 98.21, 98.72, 98.49, 83.36]
+
+esc = [99.98, 95.80, 95.60, 98.21, 95.20, 94.20, 74.40]
 
 # Function to generate interpolated frames
 def interpolate_data(x, y, num_frames):
@@ -102,15 +103,15 @@ def animate_all_models():
 
     # Create figure and axes
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.set_xlim(1, 0)
+    ax.set_xlim(0, 1)
     ax.set_ylim(50, 100)
 
     # Increase tick size
     ax.tick_params(axis='both', which='major', labelsize=16)
     ax.set_xlabel('Prune Ratio', fontsize=16)
 
-    ax.set_ylabel('Performance (%)', fontsize=16)
-    ax.set_title('Model Performance vs. Prune Ratios', fontsize=20, fontweight='bold')
+    ax.set_ylabel('Accuracy (%)', fontsize=16)
+    ax.set_title('Accuracy vs. Prune Ratios', fontsize=20, fontweight='bold')
 
     # Plot lines for each model
     line_resnet18, = ax.plot([], [], color='dimgray', linestyle='-')
@@ -122,7 +123,7 @@ def animate_all_models():
     markers_resnet101, = ax.plot([], [], color='brown', marker='s', linestyle='None', label='ResNet101', markersize=12)
     markers_esc, = ax.plot([], [], color='purple', marker='^', linestyle='None', label='ESC', markersize=12)
 
-    ax.legend(fontsize=16, loc='lower right')
+    ax.legend(fontsize=16, loc='lower left')
     ax.grid(True)
 
     # Initialization function for the animation

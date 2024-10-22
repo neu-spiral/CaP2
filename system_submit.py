@@ -12,13 +12,13 @@ import random
 os.makedirs("logs", exist_ok=True)
 
 # prune_ratios = [0.5, 0.7, 0.75, 0.8, 0.85]
-prune_ratios = [0.99]
+prune_ratios = [0.75]
 
 # lambda_comms = [0.000001, 0.00001, 0.0001]
 # lambda_comms = [0.000001]
 # lambda_comms = [10, 100, 1000]
-# lambda_comms = [1000]
-lambda_comms = [1e-5]
+lambda_comms = [1000]
+# lambda_comms = [1e-5]
 
 # num_partitions = ['2', '8', '16']
 num_partitions = ['4']
@@ -28,11 +28,11 @@ device = 'cuda:2'
 # dataset="cifar10"
 # model="resnet18"
 
-dataset="cifar100"
-model="resnet101"
+# dataset="cifar100"
+# model="resnet101"
 
-# dataset="esc"
-# model="EscFusion"
+dataset="esc"
+model="EscFusion"
 
 if __name__ == "__main__":
     for prune_ratio in prune_ratios:
