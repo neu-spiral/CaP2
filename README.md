@@ -62,26 +62,31 @@ python -m ./source/utils/send_start_message.py [path to config-leaf.json]
 Ouputs will appear in the logs/[dir log out] folder specified in the start servers script. Post processing and visaulization tools are found in sandbox/plot_timing.ipynb
 
 ## Split Network Inference on Colosseum 
-Example colosseum run procedure (TODO: generalize, add detail, and verify works):
+Example colosseum run procedure. This assumes full and split model files have been loaded onto the file-proxy server at /share/nas/[team name]/CaP-Models/perm beforehand (TODO: generalize, add detail, and verify works):
 1. Connect to VPN via cisco
 2. Make a reservation
 3. Wait until SRN nodes are spun up
 4. Manually configure colosseum/nodes.txt
 5. Wait until srn nodes are running
 6. Open bash session in folder CaP/colosseum
-7. Move repo to snr nodes, start rf, collect ip addresses, build json configs: 
+7. Move repo to SRN nodes, start rf, collect ip addresses, build json config (update params in prep_run.sh first): 
   ~~~
   bash ./prep_run.sh
   ~~~
-9. Start servers on SRN nodes for split model execution:
+9. Start servers on SRN nodes for split model execution (update params to select model and log name first):
   ~~~
   bash ./start_servers_colosseum.sh
   ~~~
-10. Send starting message to nodes:  
+10. Send starting message to nodes (update node type first):  
   ~~~ 
   bash ./start_run.sh [srn #]
   ~~~
-11. Inspect logging messages 
+11. Kill servers 
+  ~~~
+  bash ./kill_servers.sh
+  ~~~
+12. Repeat steps 9-11 for next run until finished with all runs
+13. Inspect logging messages saved to colosseums file-proxy server /share/nas/[team name] after end of reservation 
 
 ## Cite
 ```

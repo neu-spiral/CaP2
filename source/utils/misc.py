@@ -302,18 +302,12 @@ def parse_filename(filename):
     
     if len(parts) == 2:
         # dense model
-        parts += [None, 1, 0, 0]
-    
-    if len(parts) == 3:
-        # dense model with run at the end
-        parts = parts[:-1] + [None, 1, 0, 0] + parts[-1:]
-
-        # 7-th element is run 
-        params_list.append('run')
+        parts += [None, None, 0, 0]
 
     elif len(parts) == 6:
 
         # remove labels
+        parts[3] = parts[3].replace('np', '')
         parts[4] = parts[4].replace('pr', '')  # pr0.5 (parses as 0.5)
         parts[5] = parts[5].replace('lcm', '')  # lcm1e-6 (parses as 1e-6)
         
@@ -326,33 +320,9 @@ def parse_filename(filename):
         parts.append(lcm_value)  # Add the corrected lcm value
     
         # remove labels
+        parts[3] = parts[3].replace('np', '')
         parts[4] = parts[4].replace('pr', '')  # pr0.5 (parses as 0.5)
         parts[5] = parts[5].replace('lcm', '')  # lcm1e-6 (parses as 1e-6)
-
-    elif (len(parts) ==7):
-        # 7-th element is run 
-        params_list.append('run')
-
-        # remove label 
-        parts[4] = parts[4].replace('pr', '')  # pr0.5 (parses as 0.5)
-        parts[5] = parts[5].replace('lcm', '')  # lcm1e-6 (parses as 1e-6)
-        parts[6] = parts[6].replace('run', '')  # lcm1e-6 (parses as 1e-6)
-    
-    elif (len(parts) ==8 and 'e' in parts[-3]):
-        # 7-th element is run 
-        params_list.append('run')
-
-        # handle scientific notation 
-        lcm_value = parts[-3] + '-' + parts[-2]  # Join '1e' with '-6'
-        run = parts[7]
-        parts = parts[:-3] # Remove the last three parts
-        parts.append(lcm_value)  # Add the corrected lcm value
-        parts.append(run)
-    
-        # remove labels
-        parts[4] = parts[4].replace('pr', '')  # pr0.5 (parses as 0.5)
-        parts[5] = parts[5].replace('lcm', '')  # lcm1e-6 (parses as 1e-6)
-        parts[6] = parts[6].replace('run', '')  # lcm1e-6 (parses as 1e-6)
 
     else:
         print(f'Unrecongized model name format {filename}')

@@ -3,7 +3,7 @@
 ## node_list.txt should be formatted like:
 ## type-srnnumber-network node
 ## type-srnnumber-network node (etc)
-## TODO: include support for nodes using only part of the entire model 
+## TODO: include support for nodes using only part of the entire model, only copy over necessary models to machine instead of entire CaP-Models folder 
 ## Expects model name in argument to be on the file-proxy server here: /share/nas/genesys/CaP-Models
 ## if you are using cell, the base station is always the first node
 
@@ -11,7 +11,6 @@
 rf_flag=false
 
 node_file="nodes.txt"
-model_file="cifar100-resnet101-kernel-np4-pr0.85-lcm1e-05"
 leaf_connection_type='server' # CHANGE ME
 
 # TODO: remove hardcoded params for 2nd half
@@ -58,13 +57,13 @@ for ((i=1; i<=num_lines; i++)); do
 
       # Sync local repo with the remote
       echo "Syncing local repo with $prefixed_number"
-      sshpass -p "scope" rsync -avz --exclude='.git' --exclude='assets/' --exclude='logs/' --exclude='local_logs/' ../../CaP/ $prefixed_number:/root/CaP/
+      sshpass -p "scope" rsync -avz --exclude='.git' --exclude='assets/' --exclude='logs/' --exclude='local_logs/' --exclude='demo_logs/' ../../CaP/ $prefixed_number:/root/CaP/
       sleep 1
 
       # Copy model to network node      
-      echo "Copying $model_file.pt to $prefixed_number"
-      sshpass -p "scope" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/perm/$model_file.pt /tmp/ && cp -r /share/CaP-Models/perm/vsplit-$model_file /tmp/'"
-      sshpass -p "scope" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models/perm/ && cp /tmp/$model_file.pt /root/CaP/assets/models/perm/ && cp -r /tmp/vsplit-$model_file /root/CaP/assets/models/perm/" &
+      echo "Copying all models to $prefixed_number"
+      sshpass -p "scope" ssh "$prefixed_number" "su srn-user -c 'cp -r -u /share/CaP-Models/perm/ /tmp/'"
+      sshpass -p "scope" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models/ && cp -r -u /tmp/perm/ /root/CaP/assets/models/" &
       sleep 2
       
       ;;
@@ -74,25 +73,26 @@ for ((i=1; i<=num_lines; i++)); do
       echo "Running configuration for wifi type..."
       if [ "$rf_flag" = false ]; then
         echo "Starting rf scenario"
-        sshpass -p "sunflower" ssh "$prefixed_number" 'colosseumcli rf start 1017 -c'
+        sshpass -p "sunflower" ssh -n "$prefixed_number" 'colosseumcli rf start 1017 -c'
         rf_flag=true
-        sleep 10
+        
+        wait
       fi
-      sshpass -p "sunflower" ssh "$prefixed_number" "cd interactive_scripts && ./tap_setup.sh"
-      sleep 5
-      gnome-terminal -- bash -c "sshpass -p 'sunflower' ssh '$prefixed_number' 'cd interactive_scripts && ./modem_start.sh'; bash"
+      sshpass -p "sunflower" ssh -n "$prefixed_number" "cd interactive_scripts && ./tap_setup.sh"
+      wait 
+      gnome-terminal -- bash -c "sshpass -p 'sunflower' ssh -n '$prefixed_number' 'cd interactive_scripts && ./modem_start.sh'; bash"
       #mintty -- bash -c "sshpass -p 'sunflower' ssh '$prefixed_number' 'cd interactive_scripts && ./modem_start.sh'; bash"
-      sleep 1
+      wait
 
       # Sync local repo with the remote
       echo "Syncing local repo with $prefixed_number"
-      sshpass -p "sunflower" rsync -avz --exclude='.git' --exclude='assets/' --exclude='logs/' --exclude='local_logs/'  ../../CaP/ $prefixed_number:/root/CaP/
+      sshpass -p "sunflower" rsync -avz --exclude='.git' --exclude='assets/' --exclude='logs/' --exclude='local_logs/' --exclude='demo_logs/'  ../../CaP/ $prefixed_number:/root/CaP/
       sleep 1
 
       # Copy model to network node      
-      echo "Copying $model_file.pt to $prefixed_number"
-      sshpass -p "sunflower" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/perm/$model_file.pt /tmp/ && cp -r /share/CaP-Models/perm/vsplit-$model_file /tmp/'"
-      sshpass -p "sunflower" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models/perm/ && cp /tmp/$model_file.pt /root/CaP/assets/models/perm/ && cp -r /tmp/vsplit-$model_file /root/CaP/assets/models/perm/" &
+      echo "Copying all models to $prefixed_number"
+      sshpass -p "sunflower" ssh "$prefixed_number" "su srn-user -c 'cp -r -u /share/CaP-Models/perm/ /tmp/'"
+      sshpass -p "sunflower" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models/ && cp -r -u /tmp/perm/ /root/CaP/assets/models/" &
       sleep 2
 
       ;;
@@ -103,13 +103,13 @@ for ((i=1; i<=num_lines; i++)); do
 
       # Sync local networks-for-ai directory with the remote
       echo "Syncing local repo with $prefixed_number"
-      sshpass -p "ChangeMe" rsync -avz --exclude='.git' --exclude='assets/' --exclude='logs/' --exclude='local_logs/' ../../CaP/ $prefixed_number:/root/CaP/
+      sshpass -p "ChangeMe" rsync -avz --exclude='.git' --exclude='assets/' --exclude='logs/' --exclude='local_logs/' --exclude='demo_logs/' ../../CaP/ $prefixed_number:/root/CaP/
       sleep 1
 
       # Copy model to network node      
-      echo "Copying $model_file.pt to $prefixed_number"
-      sshpass -p "ChangeMe" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/perm/$model_file.pt /tmp/ && cp -r /share/CaP-Models/perm/vsplit-$model_file /tmp/'"
-      sshpass -p "ChangeMe" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models/perm/ && cp /tmp/$model_file.pt /root/CaP/assets/models/perm/ && cp -r /tmp/vsplit-$model_file /root/CaP/assets/models/perm/" &
+      echo "Copying all models to $prefixed_number"
+      sshpass -p "ChangeMe" ssh "$prefixed_number" "su srn-user -c 'cp -r -u /share/CaP-Models/perm/ /tmp/'"
+      sshpass -p "ChangeMe" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models/perm/ && cp -r -u /tmp/perm/ /root/CaP/assets/models/" &
       sleep 2
       
       ;;

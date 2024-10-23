@@ -280,7 +280,7 @@ def combine_log_files(log_file_path, log_name_substr, num_nodes):
             run_name = log_file_path.split('\\')[-1]
         else:
             run_name = log_file_path.split('\\')[-1]
-        run_str = misc.parse_filename(run_name)['run']
+        run_str = run_name.split('run')[1]
         block_event_tmp['run'] = run_str
         layer_event_tmp['run'] = run_str
 
