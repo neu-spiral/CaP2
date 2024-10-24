@@ -11,15 +11,19 @@ import numpy as np
 path = os.path.join('logs', 'demo_logs')
 
 # model_name = 'cifar100-resnet101-run1.1'
-# model_name = 'cifar100-resnet101-kernel-np4-pr0.5-lcm1e-05-run1'
-# model_name = 'cifar100-resnet101-kernel-np4-pr0.75-lcm1e-05-run1'
-model_name = 'cifar100-resnet101-kernel-np4-pr0.85-lcm1e-05-run1'
+# model_name = 'cifar100-resnet101-kernel-np4-pr0.85-lcm1e-05-run1'
+# path_partition_file = os.path.join('config', 'resnet101-np4.yaml')
+
+
+# model_name = 'esc-EscFusion-kernel-np4-pr0.85-lcm1000-run1'
+model_name = 'esc-EscFusion-run1'
+path_partition_file = os.path.join('config', 'EscFusion-np4.yaml')
 
 
 port_to_node = {49204: 0, 49200: 1, 49201: 2, 49202: 3}
 
 
-path_partition_file = os.path.join('config', 'resnet101-np4.yaml')
+
 with open(path_partition_file, 'r') as stream:
     try:
         partition = yaml.load(stream, yaml.FullLoader)
@@ -35,7 +39,7 @@ partition_list_0.remove('conv1.weight')
 
 # checkmark_image = plt.imread('sandbox/checkmark.png')
 
-slowing_factor = 10
+slowing_factor = 5
 
 interval = 1000
 scaling = 1
@@ -85,7 +89,7 @@ bar_ax.axis('off')
 labels = {node: f'Node {node}' for node in G.nodes}
 # nx.draw_networkx_labels(G, positions, labels=labels, font_color='black', font_size=15, font_weight='bold')
 
-ax_icon = plt.axes([0, 0, 2, 2])
+# ax_icon = plt.axes([0, 0, 2, 2])
 
 # network_ax = fig.add_axes([0.1, 0.3, 0.8, 0.65])  # Main plot
 # network_ax = ax
@@ -128,6 +132,9 @@ def update(frame):
         start_time = row['time']
         duration = row['dur']
         current_node = int(row['node'])
+
+        if duration < 1:
+            duration = 1
         
         # Check if the current frame corresponds to the active time
         if start_time <= frame * scaling < start_time + duration:  # frame * 1000 to convert from frames to ms
@@ -262,6 +269,8 @@ def update(frame):
         # network_ax.imshow(checkmark_image, extent=[-1.5, -1.3, 1.5, 1.3])
         # network_ax.imshow(checkmark_image, extent=[1.3, 1.5, 1.5, 1.3])
 
+    # print(progress_data[0])
+    # print(progress_data[3])
 
     # for node in progress_data.keys():
     #     if len(progress_data[node]) >= len(partition_list) and not done_executing[node]:
@@ -287,6 +296,6 @@ ani = animation.FuncAnimation(fig, update, frames=max_time, interval=interval, r
 plt.axis('off')
 # plt.tight_layout()
 
-ani.save(f'assets/figs/{model_name}_with_progress_scale{scaling}.mp4', writer='ffmpeg', fps=fps, dpi=150)
+ani.save(f'assets/figs/{model_name}_with_progress_scale{scaling}_slowing_{slowing_factor}.mp4', writer='ffmpeg', fps=fps, dpi=150)
 
 plt.close(fig)

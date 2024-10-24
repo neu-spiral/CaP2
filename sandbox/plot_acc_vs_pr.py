@@ -107,11 +107,11 @@ def animate_all_models():
     ax.set_ylim(50, 100)
 
     # Increase tick size
-    ax.tick_params(axis='both', which='major', labelsize=16)
-    ax.set_xlabel('Prune Ratio', fontsize=16)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.set_xlabel('Prune Ratio', fontsize=20)
 
-    ax.set_ylabel('Accuracy (%)', fontsize=16)
-    ax.set_title('Accuracy vs. Prune Ratios', fontsize=20, fontweight='bold')
+    ax.set_ylabel('Accuracy (%)', fontsize=20)
+    ax.set_title('Accuracy vs. Prune Ratios', fontsize=24, fontweight='bold')
 
     # Plot lines for each model
     line_resnet18, = ax.plot([], [], color='dimgray', linestyle='-')
