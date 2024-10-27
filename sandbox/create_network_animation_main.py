@@ -11,13 +11,13 @@ import numpy as np
 path = os.path.join('logs', 'demo_logs')
 
 # model_name = 'cifar100-resnet101-run1.1'
-# model_name = 'cifar100-resnet101-kernel-np4-pr0.85-lcm1e-05-run1'
-# path_partition_file = os.path.join('config', 'resnet101-np4.yaml')
+model_name = 'cifar100-resnet101-kernel-np4-pr0.85-lcm1e-05-run1'
+path_partition_file = os.path.join('config', 'resnet101-np4.yaml')
 
 
 # model_name = 'esc-EscFusion-kernel-np4-pr0.85-lcm1000-run1'
-model_name = 'esc-EscFusion-run1'
-path_partition_file = os.path.join('config', 'EscFusion-np4.yaml')
+# model_name = 'esc-EscFusion-run1'
+# path_partition_file = os.path.join('config', 'EscFusion-np4.yaml')
 
 
 port_to_node = {49204: 0, 49200: 1, 49201: 2, 49202: 3}
@@ -79,7 +79,7 @@ edges = [(0,1), (0,2), (0,3), (1,2), (1,3), (2,3),
 G.add_edges_from(edges)
 
 # Initialize the figure
-fig, (network_ax, bar_ax) = plt.subplots(2, 1, figsize=(10, 14), dpi=150, gridspec_kw={'height_ratios': [3, 1]})
+fig, (network_ax, bar_ax) = plt.subplots(2, 1, figsize=(10, 14), dpi=300, gridspec_kw={'height_ratios': [3, 1]})
 fig.subplots_adjust(hspace=0.1)
 network_ax.axis('off')
 bar_ax.axis('off')
