@@ -11,7 +11,9 @@
 rf_flag=false
 
 node_file="nodes.txt"
-leaf_connection_type='server' # CHANGE ME
+leaf_connection_type='wifi' # CHANGE ME
+
+rf_scenario=1009 # select an RF scenario from the list 
 
 # TODO: remove hardcoded params for 2nd half
 final_node=1
@@ -45,7 +47,7 @@ for ((i=1; i<=num_lines; i++)); do
       echo "Running configuration for cell type..."
       if [ "$rf_flag" = false ]; then
         echo "Starting rf scenario"
-        sshpass -p "scope" ssh "$prefixed_number" 'colosseumcli rf start 1017 -c'
+        sshpass -p "scope" ssh "$prefixed_number" "colosseumcli rf start $rf_scenario -c"
         rf_flag=true
         sleep 5
       fi
@@ -73,7 +75,7 @@ for ((i=1; i<=num_lines; i++)); do
       echo "Running configuration for wifi type..."
       if [ "$rf_flag" = false ]; then
         echo "Starting rf scenario"
-        sshpass -p "sunflower" ssh -n "$prefixed_number" 'colosseumcli rf start 1017 -c'
+        sshpass -p "sunflower" ssh -n "$prefixed_number" "colosseumcli rf start $rf_scenario -c"
         rf_flag=true
         
         wait

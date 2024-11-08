@@ -11,9 +11,15 @@ nodes_file="./nodes.txt" # Path to the JSON file
 ip_map_file="./ip-map.json"
 network_graph_file="./network-graph.json"
 leaf_file="./config-leaf.json"
-model_file="esc-EscFusion.pt" # this doesnt need full path, io utils handle it. It does need the extension in the name .pt
-log_dur_name="/logs/esc-EscFusion-run1"
-batch_size=16
+
+# resnet 
+model_file="cifar100-resnet101-kernel-np4-pr0.85-lcm1e-05.pt" # this doesnt need full path, io utils handle it. It does need the extension in the name .pt
+log_dur_name="/logs/cifar100-resnet101-kernel-np4-pr0.85-lcm1e-05-run1"
+
+#model_file="esc-EscFusion-kernel-np4-pr0.75-lcm1000.pt" # this doesnt need full path, io utils handle it. It does need the extension in the name .pt
+#log_dur_name="/logs/esc-EscFusion-kernel-np4-pr0.75-lcm1000-run1"
+
+batch_size=1
 
 # Read the input file line by line
 # iterate through each srn node

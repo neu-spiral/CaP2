@@ -31,7 +31,8 @@ while IFS= read -r line; do
 
     # move locally built configs to nodes
     # use ssh -n to ensure loop continues 
-    # add : -e 'wifi_transceiver' to end wifi connection 
+    # TODO: functionalize following
+    # add : -e 'wifi_transceiver' after -e 'run_split_model' to end wifi connection 
     echo "Shutting down servers on $srn_name($node_number)"
     sshpass -p "$psswrd" ssh -n "$srn_name" "
         pids=\$(ps aux | grep -e 'run_split_model' | grep -v 'grep' | awk '{print \$2}');

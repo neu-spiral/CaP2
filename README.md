@@ -64,29 +64,31 @@ Ouputs will appear in the logs/[dir log out] folder specified in the start serve
 ## Split Network Inference on Colosseum 
 Example colosseum run procedure. This assumes full and split model files have been loaded onto the file-proxy server at /share/nas/[team name]/CaP-Models/perm beforehand (TODO: generalize, add detail, and verify works):
 1. Connect to VPN via cisco
-2. Make a reservation
-3. Wait until SRN nodes are spun up
-4. Manually configure colosseum/nodes.txt
-5. Wait until srn nodes are running
+2. Make a reservation. Use the CAP-wifi-v1 container for WiFi nodes and JARVIS-server-cap1 for server nodes [TODO: make and test container for UE and base station nodes]
+3. While waiting for SRN nodes to spin up, modify the bash scripts in the CaP/colosseum folder:  
+  i. Manually configure colosseum/nodes.txt with the correct SRN numbers  
+  ii. In prep_run.sh, update leaf node connection type [WARNING: not tested for heterogeneous networks] and rf scenario (see colosseum documentation for more details)  
+  iii. In ./start_servers_colosseum.sh, select model file and specify log output directory name  
+  iv. In ./start_run.sh, uncomment/comment commands based on SRN type  
 6. Open bash session in folder CaP/colosseum
-7. Move repo to SRN nodes, start rf, collect ip addresses, build json config (update params in prep_run.sh first): 
+7. Move repo to SRN nodes, start rf, collect ip addresses, and build json config: 
   ~~~
   bash ./prep_run.sh
   ~~~
-9. Start servers on SRN nodes for split model execution (update params to select model and log name first):
+9. Start servers on SRN nodes for split model execution (NOTE: resnet101 models take 1-2 minutes to load):
   ~~~
   bash ./start_servers_colosseum.sh
   ~~~
-10. Send starting message to nodes (update node type first):  
+10. Send starting message to nodes:  
   ~~~ 
   bash ./start_run.sh [srn #]
   ~~~
-11. Kill servers 
+11. Kill servers (can also be used to kill RF scenario, see script comments for details)
   ~~~
   bash ./kill_servers.sh
   ~~~
-12. Repeat steps 9-11 for next run until finished with all runs
-13. Inspect logging messages saved to colosseums file-proxy server /share/nas/[team name] after end of reservation 
+12. Update the log file name in CaP/colosseum/start_servers_colosseum.sh (separate run outputs) and repeat steps 9-11 for next run until finished with all runs
+13. Inspect logging messages saved to colosseum's file-proxy server /share/nas/[team name] after end of reservation 
 
 ## Cite
 ```
