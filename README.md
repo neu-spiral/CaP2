@@ -68,7 +68,7 @@ Example colosseum run procedure. This assumes full and split model files have be
 3. While waiting for SRN nodes to spin up, modify the bash scripts in the CaP/colosseum folder:  
   i. Manually configure colosseum/nodes.txt with the correct SRN numbers  
   ii. In prep_run.sh, update leaf node connection type [WARNING: not tested for heterogeneous networks] and rf scenario (see colosseum documentation for more details)  
-  iii. In ./start_servers_colosseum.sh, select model file and specify log output directory name  
+  iii. In ./start_servers_colosseum.sh, select model file, batch size, and specify log output directory name  
   iv. In ./start_run.sh, uncomment/comment commands based on SRN type  
 6. Open bash session in folder CaP/colosseum
 7. Move repo to SRN nodes, start rf, collect ip addresses, and build json config: 
