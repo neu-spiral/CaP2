@@ -466,7 +466,7 @@ class SplitManager:
         '''
 
         input_size = misc.get_input_dim(self.configs, batch_size)[0] # TODO: handle different input sizes for esc and flashnet?
-        full_model_input = torch.zeros(input_size, dtype=self.dtype, device=self.device) # keep track of tensor I/O on this node. This is the size of the full tensor input for layer = current_layer
+        full_model_input = torch.rand(input_size, dtype=self.dtype, device=self.device) # keep track of tensor I/O on this node. This is the size of the full tensor input for layer = current_layer
 
         return full_model_input
 
