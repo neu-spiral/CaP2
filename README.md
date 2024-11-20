@@ -50,37 +50,45 @@ Model inference over a network can be emulated by starting multiple threads on a
   bash local_network/start_servers_linus.sh
 ~~~
 6. Activate python environment  
-7. Send inputs (WARNING only works for cifar10 inputs).:
+7. Send inputs:
 ~~~
 # Windows 
-python -m source.utils.send_leaf_split_model [path to config-leaf.json]
+python -m source.utils.send_start_message [path to config-leaf.json]
 
 # Linux
-python -m ./source/utils/send_leaf_split_model.py [path to config-leaf.json]
+python -m ./source/utils/send_start_message.py [path to config-leaf.json]
 ~~~
 
 Ouputs will appear in the logs/[dir log out] folder specified in the start servers script. Post processing and visaulization tools are found in sandbox/plot_timing.ipynb
 
 ## Split Network Inference on Colosseum 
-Example colosseum run procedure (TODO: generalize, add detail, and verify works):
-1. connect to VPN via cisco
-2. make reservation
-3. wait until srn nodes are spun up
-4. manually configure colosseum/nodes.txt
-5. wait until srn nodes are running
-6. open bash session in CaP/colosseum repo
-7. move repo to snr nodes, start rf, and collect ip addresses:
-  bash ./setup.sh nodes_test.txt cifar10-resnet18-kernel-npv2-pr0.75-lcm0.001
-9. start servers for running split model:
-  bash ./start_servers_colosseum.sh "./nodes_test.txt" "./ip-map.json" "./network-graph.json" "cifar10-resnet18-kernel-npv2-pr0.75-lcm0.001.pt"
-10. send inputs to leaf nodes:  
-  open windows terminal in CaP repo  
-  conda activate cap_nb  
-  source env.sh  
-  python -m send_leaf_split_model colosseum/config-leaf.json  
-  OR  
-  gnome-terminal -- bash -c "sshpass -p ChangeMe ssh genesys-115 'cd /root/CaP && source env.sh && source ../cap-310/bin/activate && python3 -m send_leaf_split_model colosseum/config-leaf.json; bash '" &
-
+Example colosseum run procedure. This assumes full and split model files have been loaded onto the file-proxy server at /share/nas/[team name]/CaP-Models/perm beforehand (TODO: generalize, add detail, and verify works):
+1. Connect to VPN via cisco
+2. Make a reservation. Use the CAP-wifi-v1 container for WiFi nodes and JARVIS-server-cap1 for server nodes [TODO: make and test container for UE and base station nodes]
+3. While waiting for SRN nodes to spin up, modify the bash scripts in the CaP/colosseum folder:  
+  i. Manually configure colosseum/nodes.txt with the correct SRN numbers  
+  ii. In prep_run.sh, update leaf node connection type [WARNING: not tested for heterogeneous networks] and rf scenario (see colosseum documentation for more details)  
+  iii. In ./start_servers_colosseum.sh, select model file, batch size, and specify log output directory name  
+  iv. In ./start_run.sh, uncomment/comment commands based on SRN type  
+6. Open bash session in folder CaP/colosseum
+7. Move repo to SRN nodes, start rf, collect ip addresses, and build json config: 
+  ~~~
+  bash ./prep_run.sh
+  ~~~
+9. Start servers on SRN nodes for split model execution (NOTE: resnet101 models take 1-2 minutes to load):
+  ~~~
+  bash ./start_servers_colosseum.sh
+  ~~~
+10. Send starting message to nodes:  
+  ~~~ 
+  bash ./start_run.sh [srn #]
+  ~~~
+11. Kill servers (can also be used to kill RF scenario, see script comments for details)
+  ~~~
+  bash ./kill_servers.sh
+  ~~~
+12. Update the log file name in CaP/colosseum/start_servers_colosseum.sh (separate run outputs) and repeat steps 9-11 for next run until finished with all runs
+13. Inspect logging messages saved to colosseum's file-proxy server /share/nas/[team name] after end of reservation 
 
 ## Cite
 ```
