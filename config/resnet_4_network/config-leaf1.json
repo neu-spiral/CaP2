@@ -1,0 +1,11 @@
+{
+    "servers": [
+        {
+            "node": 1,
+            "ip": "127.0.0.1",
+            "port": 5001,
+            "connection_from": "server", 
+            "data": "True"
+        }
+    ]
+}

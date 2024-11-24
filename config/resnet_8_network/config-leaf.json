@@ -1,0 +1,60 @@
+{
+    "servers": [ 
+        {
+            "node": 0,
+            "ip": "127.0.0.1",
+            "port": 5000,
+            "connection_from": "server", 
+            "data": "False"
+        },
+        {
+            "node": 1,
+            "ip": "127.0.0.1",
+            "port": 5001,
+            "connection_from": "server", 
+            "data": "True"
+        }, 
+        {
+            "node" : 2,
+            "ip": "127.0.0.1",
+            "port": 5002,
+            "connection_from": "server",
+            "data": "True"
+        }, 
+        {
+            "node" : 3,
+            "ip": "127.0.0.1",
+            "port": 5003,
+            "connection_from": "server",
+            "data": "True"
+        },
+        {
+            "node": 4,
+            "ip": "127.0.0.1",
+            "port": 5004,
+            "connection_from": "server", 
+            "data": "False"
+        },
+        {
+            "node": 5,
+            "ip": "127.0.0.1",
+            "port": 5005,
+            "connection_from": "server", 
+            "data": "True"
+        }, 
+        {
+            "node" : 6,
+            "ip": "127.0.0.1",
+            "port": 5006,
+            "connection_from": "server",
+            "data": "True"
+        }, 
+        {
+            "node" : 7,
+            "ip": "127.0.0.1",
+            "port": 5007,
+            "connection_from": "server",
+            "data": "True"
+        }
+    ]
+}

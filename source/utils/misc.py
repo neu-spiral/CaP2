@@ -288,7 +288,7 @@ def get_lr(optimizer):
         return param_group['lr']
 
 def parse_filename(filename):
-    ''' Parse filenamse of pruned models e.g. cifar10-resnet18-kernel-np4-pr0.5-lcm0.0001.pt
+    ''' Parse filenames of pruned models e.g. cifar10-resnet18-kernel-np4-pr0.5-lcm0.0001.pt
         and cifar100-resnet101-kernel-np4-pr0.7-lcm1e-06.pt and dense models cifar10-resnet18.pt'''
 
     # make dict
