@@ -44,6 +44,9 @@ while IFS= read -r line; do
         fi
     " 
 
+    # end rf secnario
+    #sshpass -p "$psswrd" ssh -n "$srn_name" "colosseumcli rf stop"
+
     # kill wifi_transceiver.py
     #|| { echo "SSH command failed for $srn_name, continuing to next element"; continue; } 
     echo ""

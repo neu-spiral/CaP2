@@ -8,16 +8,16 @@
 ## if you are using cell, the base station is always the first node
 
 # Initialize a flag to track if cell or wifi nodes are encountered
-rf_flag=false
+rf_flag=false # not needed remove
 
 node_file="nodes.txt"
-leaf_connection_type='wifi' # CHANGE ME
+leaf_connection_type='server' # CHANGE ME
 
-rf_scenario=1009 # select an RF scenario from the list 
+rf_scenario=51005 # select an RF scenario from the list 
 
 # TODO: remove hardcoded params for 2nd half
 final_node=1
-starting_port=49200 # Starting port definition TODO: increment this? Right not this does not change
+starting_port=1009 # Starting port definition TODO: increment this? Right not this does not change
 ip_map_file='ip-map.json'
 leaf_file='config-leaf.json'
 graph_file='network-graph.json'

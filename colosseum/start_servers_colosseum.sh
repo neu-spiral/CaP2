@@ -12,12 +12,24 @@ ip_map_file="./ip-map.json"
 network_graph_file="./network-graph.json"
 leaf_file="./config-leaf.json"
 
-# resnet 
-model_file="cifar100-resnet101-kernel-np4-pr0.85-lcm1e-05.pt" # this doesnt need full path, io utils handle it. It does need the extension in the name .pt
-log_dur_name="/logs/cifar100-resnet101-kernel-np4-pr0.85-lcm1e-05-run1"
+# resnet101
+#model_file="cifar100-resnet101.pt" # this doesnt need full path, io utils handle it. It does need the extension in the name .pt
+#log_dur_name="/logs/cifar100-resnet101-run1"
+#model_file="cifar100-resnet101-kernel-np4-pr0.5-lcm1e-05.pt" # this doesnt need full path, io utils handle it. It does need the extension in the name .pt
+#log_dur_name="/logs/cifar100-resnet101-kernel-np4-pr0.5-lcm1e-05-run2"
 
-#model_file="esc-EscFusion-kernel-np4-pr0.75-lcm1000.pt" # this doesnt need full path, io utils handle it. It does need the extension in the name .pt
-#log_dur_name="/logs/esc-EscFusion-kernel-np4-pr0.75-lcm1000-run1"
+# resnet 
+#model_file="cifar10-resnet18.pt" # this doesnt need full path, io utils handle it. It does need the extension in the name .pt
+#log_dur_name="/logs/cifar10-resnet18-run1"
+#model_file="cifar100-resnet101-kernel-np4-pr0.5-lcm1e-05.pt" # this doesnt need full path, io utils handle it. It does need the extension in the name .pt
+#log_dur_name="/logs/cifar100-resnet101-kernel-np4-pr0.5-lcm1e-05-run2"
+
+
+# esc fusion
+#model_file="esc-EscFusion.pt" # this doesnt need full path, io utils handle it. It does need the extension in the name .pt
+#log_dur_name="/logs/esc-EscFusion-run1"
+model_file="esc-EscFusion-kernel-np4-pr0.85-lcm1000.pt" # this doesnt need full path, io utils handle it. It does need the extension in the name .pt
+log_dur_name="/logs/esc-EscFusion-kernel-np4-pr0.85-lcm1000-runhetero"
 
 batch_size=1
 
@@ -49,9 +61,10 @@ while IFS= read -r line; do
         ;;
     esac
 
-    # move locally built configs to nodes
+    # move locally built configs to nodes (optional)
     echo "Copying JSONs to node $srn_name($node_number)"
     sshpass -p "$psswrd" scp "$ip_map_file" "$network_graph_file" "$leaf_file" "$srn_name":/root/CaP/colosseum
+    sshpass -p "$psswrd" scp ../run_split_model.py "$srn_name":/root/CaP
     sshpass -p "$psswrd" scp ../run_split_model.py "$srn_name":/root/CaP
 
     # start servers on node 
