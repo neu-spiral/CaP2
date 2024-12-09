@@ -38,7 +38,7 @@ bn_type: regular
 
 par_first_layer: True
 comm_outsize: True
-lambda_comm: 100
+lambda_comm: 10
 lambda_comp: 0
 create_partition: False
 load_dense_model: True

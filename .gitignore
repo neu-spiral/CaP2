@@ -3,6 +3,8 @@
 /assets/data/
 /models/
 /logs/
+/local_logs/
+/demo_logs/
 **/__pycache__/
 __pycache__/
 .vscode

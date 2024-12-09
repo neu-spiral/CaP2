@@ -3,29 +3,32 @@
 ## node_list.txt should be formatted like:
 ## type-srnnumber-network node
 ## type-srnnumber-network node (etc)
-## TODO: include support for nodes using only part of the entire model 
+## TODO: include support for nodes using only part of the entire model, only copy over necessary models to machine instead of entire CaP-Models folder 
 ## Expects model name in argument to be on the file-proxy server here: /share/nas/genesys/CaP-Models
 ## if you are using cell, the base station is always the first node
 
 # Initialize a flag to track if cell or wifi nodes are encountered
 rf_flag=false
 
+node_file="nodes.txt"
+leaf_connection_type='wifi' # CHANGE ME
+
+rf_scenario=1009 # select an RF scenario from the list 
+
 # TODO: remove hardcoded params for 2nd half
 final_node=1
 starting_port=49200 # Starting port definition TODO: increment this? Right not this does not change
-leaf_connection_type='server'
 ip_map_file='ip-map.json'
 leaf_file='config-leaf.json'
 graph_file='network-graph.json'
 
-
 # Get the number of lines in the file
-num_lines=$(wc -l < "$1")
+num_lines=$(wc -l < "$node_file")
 
 # Loop through each line number
 for ((i=1; i<=num_lines; i++)); do
   # Read the line using sed
-  line=$(sed -n "${i}p" "$1")
+  line=$(sed -n "${i}p" "$node_file")
 
   # Split the line into three variables
   node_type=$(echo "$line" | cut -d'-' -f1)
@@ -44,7 +47,7 @@ for ((i=1; i<=num_lines; i++)); do
       echo "Running configuration for cell type..."
       if [ "$rf_flag" = false ]; then
         echo "Starting rf scenario"
-        sshpass -p "scope" ssh "$prefixed_number" 'colosseumcli rf start 1017 -c'
+        sshpass -p "scope" ssh "$prefixed_number" "colosseumcli rf start $rf_scenario -c"
         rf_flag=true
         sleep 5
       fi
@@ -56,13 +59,13 @@ for ((i=1; i<=num_lines; i++)); do
 
       # Sync local repo with the remote
       echo "Syncing local repo with $prefixed_number"
-      sshpass -p "scope" rsync -avz --exclude='.git' --exclude='assets/' ../../CaP/ $prefixed_number:/root/CaP/
+      sshpass -p "scope" rsync -avz --exclude='.git' --exclude='assets/' --exclude='logs/' --exclude='local_logs/' --exclude='demo_logs/' ../../CaP/ $prefixed_number:/root/CaP/
       sleep 1
 
       # Copy model to network node      
-      echo "Copying $2.pt to $prefixed_number"
-      sshpass -p "scope" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/$2.pt /tmp/'"
-      sshpass -p "scope" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models && cp /tmp/$2.pt /root/CaP/assets/models/" &
+      echo "Copying all models to $prefixed_number"
+      sshpass -p "scope" ssh "$prefixed_number" "su srn-user -c 'cp -r -u /share/CaP-Models/perm/ /tmp/'"
+      sshpass -p "scope" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models/ && cp -r -u /tmp/perm/ /root/CaP/assets/models/" &
       sleep 2
       
       ;;
@@ -72,25 +75,26 @@ for ((i=1; i<=num_lines; i++)); do
       echo "Running configuration for wifi type..."
       if [ "$rf_flag" = false ]; then
         echo "Starting rf scenario"
-        sshpass -p "sunflower" ssh "$prefixed_number" 'colosseumcli rf start 1017 -c'
+        sshpass -p "sunflower" ssh -n "$prefixed_number" "colosseumcli rf start $rf_scenario -c"
         rf_flag=true
-        sleep 10
+        
+        wait
       fi
-      sshpass -p "sunflower" ssh "$prefixed_number" "cd interactive_scripts && ./tap_setup.sh"
-      sleep 5
-      gnome-terminal -- bash -c "sshpass -p 'sunflower' ssh '$prefixed_number' 'cd interactive_scripts && ./modem_start.sh'; bash"
+      sshpass -p "sunflower" ssh -n "$prefixed_number" "cd interactive_scripts && ./tap_setup.sh"
+      wait 
+      gnome-terminal -- bash -c "sshpass -p 'sunflower' ssh -n '$prefixed_number' 'cd interactive_scripts && ./modem_start.sh'; bash"
       #mintty -- bash -c "sshpass -p 'sunflower' ssh '$prefixed_number' 'cd interactive_scripts && ./modem_start.sh'; bash"
-      sleep 1
+      wait
 
       # Sync local repo with the remote
       echo "Syncing local repo with $prefixed_number"
-      sshpass -p "sunflower" rsync -avz --exclude='.git' --exclude='assets/'  ../../CaP/ $prefixed_number:/root/CaP/
+      sshpass -p "sunflower" rsync -avz --exclude='.git' --exclude='assets/' --exclude='logs/' --exclude='local_logs/' --exclude='demo_logs/'  ../../CaP/ $prefixed_number:/root/CaP/
       sleep 1
 
       # Copy model to network node      
-      echo "Copying $2.pt to $prefixed_number"
-      sshpass -p "sunflower" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/$2.pt /tmp/'"
-      sshpass -p "sunflower" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models && cp /tmp/$2.pt /root/CaP/assets/models/" &
+      echo "Copying all models to $prefixed_number"
+      sshpass -p "sunflower" ssh "$prefixed_number" "su srn-user -c 'cp -r -u /share/CaP-Models/perm/ /tmp/'"
+      sshpass -p "sunflower" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models/ && cp -r -u /tmp/perm/ /root/CaP/assets/models/" &
       sleep 2
 
       ;;
@@ -101,13 +105,13 @@ for ((i=1; i<=num_lines; i++)); do
 
       # Sync local networks-for-ai directory with the remote
       echo "Syncing local repo with $prefixed_number"
-      sshpass -p "ChangeMe" rsync -avz --exclude='.git' --exclude='assets/' ../../CaP/ $prefixed_number:/root/CaP/
+      sshpass -p "ChangeMe" rsync -avz --exclude='.git' --exclude='assets/' --exclude='logs/' --exclude='local_logs/' --exclude='demo_logs/' ../../CaP/ $prefixed_number:/root/CaP/
       sleep 1
 
       # Copy model to network node      
-      echo "Copying $2.pt to $prefixed_number"
-      sshpass -p "ChangeMe" ssh "$prefixed_number" "su srn-user -c 'cp /share/CaP-Models/$2.pt /tmp/'"
-      sshpass -p "ChangeMe" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models && cp /tmp/$2.pt /root/CaP/assets/models/" &
+      echo "Copying all models to $prefixed_number"
+      sshpass -p "ChangeMe" ssh "$prefixed_number" "su srn-user -c 'cp -r -u /share/CaP-Models/perm/ /tmp/'"
+      sshpass -p "ChangeMe" ssh "$prefixed_number" "mkdir -p /root/CaP/assets/models/perm/ && cp -r -u /tmp/perm/ /root/CaP/assets/models/" &
       sleep 2
       
       ;;
@@ -166,7 +170,7 @@ while IFS= read -r line; do
     # associative arrays dont support array type values, store as string and parse later
     edges["$node"]=$(echo "$line" | cut -d'-' -f4) 
 
-done < "$1"
+done < "$node_file"
 
 # Iterate through network nodes
 
