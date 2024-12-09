@@ -28,12 +28,14 @@ def computeassignment(c,b=None):
     m = Munkres()
     indexes = m.compute(cv)
     output=[]
+    rcs=[]
     for row, column in indexes:
         rc=column // b
         #print("vm= ", column, "m= ",rc)
         value = c[row][rc]
         output.append((row,rc,value))
-    return output
+        rcs.append(rc)
+    return rcs #output
         
     
 
