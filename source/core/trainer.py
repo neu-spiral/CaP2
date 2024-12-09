@@ -2,6 +2,7 @@ import time
 from tqdm import tqdm
 from ..utils.misc import *
 from ..utils.eval import *
+from ..utils.assignment import *
 from .admm import *
 
 def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, scheduler, ADMM=None, masks=None, comm=False):
@@ -109,6 +110,12 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
             admm_adjust_learning_rate(optimizer, cepoch, configs)
         else:
             scheduler.step()
+
+        # Reassign neurons to machines
+        if configs['reassign'] and (batch_idx+1) % configs['reassign_freq'] == 0:
+            update_assignments(model, configs)
+            configs['comm_costs'] = set_communication_cost(model, configs['partition'])
+
 
         acc1 = evalHelper.call(output, target)
         batch_loss.update(loss.item(), target.size(0))
