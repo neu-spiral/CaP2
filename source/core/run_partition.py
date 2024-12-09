@@ -173,8 +173,8 @@ def main():
     # if args.sparsity_type:
     if 'sparsity_type' not in config_dict and args.sparsity_type:
         config_dict['sparsity_type'] = args.sparsity_type
-    if args.prune_ratio or args.prune_ratio == 0:
-    # if 'prune_ratio' not in config_dict and args.prune_ratio:
+    # if args.prune_ratio or args.prune_ratio == 0:
+    if 'prune_ratio' not in config_dict and args.prune_ratio:
         config_dict['prune_ratio'] = args.prune_ratio
     # if args.rho:
     if 'rho' not in config_dict and args.rho:

@@ -34,7 +34,7 @@ class SplitManager:
 
         torch.manual_seed(configs['seed'])
         self.configs = configs
-        self.model_file = configs['model_file']
+        self.model_file = configs['load_pruned_model_file']
 
         # misc
         self.machine = machine
@@ -58,7 +58,7 @@ class SplitManager:
 
         # load model TODO: only load what is necessary for this thread
         model = get_model_from_code(configs).to(configs['device']) # grabs model architecture from ./source/models/escnet.py
-        state_dict = torch.load(io.get_model_path_split("{}".format(configs["model_file"])), map_location=configs['device'])
+        state_dict = torch.load(io.get_model_path_split("{}".format(configs["load_pruned_model_file"])), map_location=configs['device'])
         self.model = io.load_state_dict(model, 
                     state_dict['model_state_dict'] if 'model_state_dict' in state_dict 
                     else state_dict['state_dict'] if 'state_dict' in state_dict else state_dict,)
