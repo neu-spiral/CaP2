@@ -62,7 +62,7 @@ class SplitManager:
                     state_dict['model_state_dict'] if 'model_state_dict' in state_dict 
                     else state_dict['state_dict'] if 'state_dict' in state_dict else state_dict,)
         
-        model = model.type(self.dtype)
+        self.model = model.type(self.dtype)
         self.model.eval()
 
         # residual connections/block related
@@ -259,6 +259,9 @@ class SplitManager:
             logger.debug(f'FINAL TENSOR FOR: #{self.current_layer}-{curr_layer_name}; Shape={list(self.current_tensor.shape)}')
             logger.debug(f'SPLIT OUTPUT: {self.current_tensor}')
             logger.debug(f'FULL OUTPUT: {self.horz_output[self.layer_names_fx[-2]]}')
+
+            logger.debug('\nfinal output comparison')
+            logger.debug(self.check_current_tensor())
         else:
             # prep mask for this node
             out_channel_array = torch.arange(out_tensor.shape[1]) # all indexes of full output
@@ -296,35 +299,39 @@ class SplitManager:
 
     @staticmethod
     def compare_helper(split_output, truth_output):
-        indent_str = '\t'*2
 
-        diff_output = torch.abs(split_output - truth_output)
+        with torch.no_grad():
+            indent_str = '\t'*2
 
-        N_batch = split_output.shape[0]
+            diff_output = torch.abs(split_output - truth_output)
 
-        print_str = ''
-        print_str = print_str + indent_str + 'Max diff:'
-        max_diff= torch.max(torch.reshape(diff_output, (N_batch, -1)), dim=1)[0]
-        print_str = print_str + indent_str + str(max_diff)
-        #plt.hist(diff_output.reshape((-1,)))
-        #plt.show()
+            N_batch = split_output.shape[0]
 
-        max_by_Cout = torch.max(torch.abs(diff_output.reshape((1,truth_output.shape[1],-1))), dim=2)
+            print_str = ''
+            print_str = print_str + indent_str + 'Max diff:'
+            max_diff= torch.max(torch.reshape(diff_output, (N_batch, -1)), dim=1)[0]
+            print_str = print_str + indent_str + str(max_diff)
+            #plt.hist(diff_output.reshape((-1,)))
+            #plt.show()
 
-        print_str = print_str + '\n'
-        print_str = print_str + indent_str + str(max_by_Cout[0])
-        print_str = print_str + indent_str + str(split_network.get_nonzero_channels(max_by_Cout[0]))
+            max_by_Cout = torch.max(torch.abs(diff_output.reshape((1,truth_output.shape[1],-1))), dim=2)
 
+            max_pError = torch.max(diff_output/split_output*100)
 
-        # get C_out with zero and non-zero diff
-        nonzero_Cout = split_network.get_nonzero_channels(split_output)
-        failing_Cout = nonzero_Cout[torch.isin(nonzero_Cout, split_network.get_nonzero_channels(max_by_Cout[0]))]
-        passing_Cout = nonzero_Cout[torch.isin(nonzero_Cout, split_network.get_nonzero_channels(max_by_Cout[0])) == False]
-        print_str = print_str + '\n'
-        print_str = print_str + indent_str + f'failing Cout = {failing_Cout}  (len = {len(failing_Cout)})'
-        print_str = print_str + indent_str + f'passing Cout = {passing_Cout}  (len = {len(passing_Cout)})'
+            print_str = print_str + '\n'
+            print_str = print_str + indent_str + str(max_by_Cout[0])
+            print_str = print_str + indent_str + str(split_network.get_nonzero_channels(max_by_Cout[0]))
+            #print_str = print_str + f'\nMax %Error {max_pError}\n'
 
-        return max_diff, max_by_Cout, print_str
+            # get C_out with zero and non-zero diff
+            nonzero_Cout = split_network.get_nonzero_channels(split_output)
+            failing_Cout = nonzero_Cout[torch.isin(nonzero_Cout, split_network.get_nonzero_channels(max_by_Cout[0]))]
+            passing_Cout = nonzero_Cout[torch.isin(nonzero_Cout, split_network.get_nonzero_channels(max_by_Cout[0])) == False]
+            print_str = print_str + '\n'
+            print_str = print_str + indent_str + f'failing Cout = {failing_Cout}  (len = {len(failing_Cout)})'
+            print_str = print_str + indent_str + f'passing Cout = {passing_Cout}  (len = {len(passing_Cout)})'
+
+            return max_diff, max_by_Cout, print_str, max_pError
 
         
     def check_current_tensor(self, limit=1e-4):
@@ -347,15 +354,19 @@ class SplitManager:
         truth_output = self.horz_output[output_layer_name]
         
         if torch.is_tensor(truth_output):
-            #logger.debug(f'Checking output from {output_layer_name} C_in {input_channels}: ')
-            max_diff, max_by_Cout, print_str = SplitManager.compare_helper(self.current_tensor[:,input_channels,], truth_output[:,input_channels,])
-            #logger.debug('\n\n')
+            logger.debug(f'Checking output from {output_layer_name} C_in {input_channels}: ')
+            max_diff, max_by_Cout, print_str, max_pError = SplitManager.compare_helper(self.current_tensor[:,input_channels,], truth_output[:,input_channels,])
+            #logger.debug(print_str)
+            logger.debug(f'Max difference layer {output_layer_name} is {torch.max(max_diff)}')
+            logger.debug(f'Max percent error layer {output_layer_name} is {max_pError}%')
+            logger.debug('\n\n')
 
-            if torch.any(max_diff > limit) or is_final_layer:
+            if torch.any(max_diff > limit):
                 logger.error('ERROR:')
                 logger.error(print_str)
                 return 0
             else:
+                logger.debug(f'Layer {output_layer_name} passed checking')
                 return 1 
         else:
             # handles "size" layer that doesn't output anything (e.g. truth_output = 1)
@@ -466,7 +477,10 @@ class SplitManager:
         '''
 
         input_size = misc.get_input_dim(self.configs, batch_size)[0] # TODO: handle different input sizes for esc and flashnet?
-        full_model_input = torch.rand(input_size, dtype=self.dtype, device=self.device) # keep track of tensor I/O on this node. This is the size of the full tensor input for layer = current_layer
+        #full_model_input = torch.rand(input_size, dtype=self.dtype, device=self.device) # keep track of tensor I/O on this node. This is the size of the full tensor input for layer = current_layer
+
+        # WARNING CHANGE BACK 
+        full_model_input = torch.ones(input_size, dtype=self.dtype, device=self.device)
 
         return full_model_input
 
@@ -596,6 +610,8 @@ class SplitManager:
                             # add to current tensor 
                             # TODO: experiment with adding up on CPU first then sending to GPU vs sending over and over to GPU
                             self.current_tensor[:, input_channels,] = data_dict['tensor'].to(self.device) + self.current_tensor.index_select(1, input_channels)
+                # check layer output 
+                self.check_current_tensor()
 
 
     def is_comm_layer(self, layer):
@@ -870,11 +886,7 @@ class SplitManager:
 
                 num_FLOPS, num_params = calflops.calflops(split_layer, (curr_input_slice,), do_print=False) # TODO: sanity check this makes sense 
                 logger.debug(f'FLOPS for {layer_name} layer={imodule} FLOPS={num_FLOPS} parameters={num_params}')
-
-            exec_layer_name = self.get_layer_name(imodule)
-            nonzero_output_channels = split_network.get_nonzero_channels(out_tensor)
-            #logger.debug(f'EXECUTED: #{imodule}-{exec_layer_name}')  
-            #logger.debug(f'SPLIT OUTPUT: Shape={list(out_tensor.shape)}; C_out={nonzero_output_channels.numpy()}')  
+ 
             return out_tensor, do_comm
 
     
@@ -1044,6 +1056,7 @@ class SplitManager:
             if not (is_final_layer or is_operation):
                 layer_path = os.path.join(split_layer_dir,  f'{curr_layer_name}.pth')
                 split_layers[curr_layer_name] = torch.load(layer_path, map_location=self.device).eval()
+                split_layers[curr_layer_name] = split_layers[curr_layer_name].type(self.dtype) # convert precision 
 
             if self.debug:
                 percent_done = ((layer-self.starting_layer)/layers_for_machine)*100
