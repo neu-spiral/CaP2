@@ -296,7 +296,7 @@ class SplitManager:
             if layer_name in self.configs['partition']:
                 return self.configs['partition'][layer_name]['filter_id'][self.machine]
             ilayer -= 1
-
+    
     @staticmethod
     def compare_helper(split_output, truth_output):
 
@@ -807,6 +807,14 @@ class SplitManager:
             
             elif 'view' in layer_name:
                 #logger.info('Reshaping (view)')
+
+                # TODO: this is a bandaid that  probably doesnt generalize well. 
+                # Implement function or attribute that precomputs input and output splitting for all 
+                # layers! Not just linear and conv.
+                # update output channels for 
+                self.output_channel_map = [np.array([])]*self.N_machines
+                self.output_channel_map[self.machine] = self.get_channels(imodule+1)[0] # get the input channels for the next layer. This ensures init_current_tensor will update the correct input channels  
+
                 return curr_input.view(curr_input.size(0), -1), False
             
             # elif 'getitem' in self.layer_names_fx[imodule]:
