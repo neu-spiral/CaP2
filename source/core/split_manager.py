@@ -86,6 +86,8 @@ class SplitManager:
         # TODO: reimplement so model output validation still works. load_starting_data depends on self.layer_output_size_LUT wh
         full_model_input = self.load_full_model_input( batch_size)
         self.horz_output, self.layer_output_size_LUT = split_network.get_output_at_each_layer(model, full_model_input) # TODO: find a way to get layer_output_size_LUT without executing on every layer
+        self.L_inf_layer = torch.zeros((batch_size, len(self.layer_names_fx))) # store split layer checking metric layer max difference 
+        self.layers_checked = np.array([]) # keeps track of layers executed that modify output 
 
         # setup input tensor (size equal to full model, has non-zero values for channels this machine is responsible for calculating)
         self.current_tensor = self.load_starting_tensor(full_model_input)
@@ -260,7 +262,7 @@ class SplitManager:
             logger.debug(f'SPLIT OUTPUT: {self.current_tensor}')
             logger.debug(f'FULL OUTPUT: {self.horz_output[self.layer_names_fx[-2]]}')
 
-            logger.debug('\nfinal output comparison')
+            logger.debug('final output comparison')
             logger.debug(self.check_current_tensor())
         else:
             # prep mask for this node
@@ -301,37 +303,16 @@ class SplitManager:
     def compare_helper(split_output, truth_output):
 
         with torch.no_grad():
-            indent_str = '\t'*2
-
+            N_batch = split_output.shape[0]
             diff_output = torch.abs(split_output - truth_output)
 
-            N_batch = split_output.shape[0]
+            L_inf= torch.max(torch.reshape(diff_output, (N_batch, -1)), dim=1)[0]
+            max_L_inf=torch.max(L_inf)
+            mean_L_inf=torch.mean(L_inf)
+            std_L_inf=torch.std(L_inf)
+            perc99_L_inf=torch.quantile(L_inf, 0.99)
 
-            print_str = ''
-            print_str = print_str + indent_str + 'Max diff:'
-            max_diff= torch.max(torch.reshape(diff_output, (N_batch, -1)), dim=1)[0]
-            print_str = print_str + indent_str + str(max_diff)
-            #plt.hist(diff_output.reshape((-1,)))
-            #plt.show()
-
-            max_by_Cout = torch.max(torch.abs(diff_output.reshape((1,truth_output.shape[1],-1))), dim=2)
-
-            max_pError = torch.max(diff_output/split_output*100)
-
-            print_str = print_str + '\n'
-            print_str = print_str + indent_str + str(max_by_Cout[0])
-            print_str = print_str + indent_str + str(split_network.get_nonzero_channels(max_by_Cout[0]))
-            #print_str = print_str + f'\nMax %Error {max_pError}\n'
-
-            # get C_out with zero and non-zero diff
-            nonzero_Cout = split_network.get_nonzero_channels(split_output)
-            failing_Cout = nonzero_Cout[torch.isin(nonzero_Cout, split_network.get_nonzero_channels(max_by_Cout[0]))]
-            passing_Cout = nonzero_Cout[torch.isin(nonzero_Cout, split_network.get_nonzero_channels(max_by_Cout[0])) == False]
-            print_str = print_str + '\n'
-            print_str = print_str + indent_str + f'failing Cout = {failing_Cout}  (len = {len(failing_Cout)})'
-            print_str = print_str + indent_str + f'passing Cout = {passing_Cout}  (len = {len(passing_Cout)})'
-
-            return max_diff, max_by_Cout, print_str, max_pError
+            return L_inf, max_L_inf, mean_L_inf, std_L_inf, perc99_L_inf 
 
         
     def check_current_tensor(self, limit=1e-4):
@@ -341,36 +322,46 @@ class SplitManager:
 
         input_channels = self.get_last_partition()
         if self.current_layer == self.total_layers_fx:
-            output_layer_name = self.layer_names_fx[self.current_layer-2]
+            checking_layer = self.current_layer-2
+            output_layer_name = self.layer_names_fx[checking_layer]
         else:
-            output_layer_name = self.layer_names_fx[self.current_layer-1]
+            checking_layer=self.current_layer-1
+            output_layer_name = self.layer_names_fx[checking_layer]
 
-        # handle check for final layer
-        if self.current_layer == self.total_layers_fx:
-            is_final_layer = True
-        else:
-            is_final_layer = False
-
+        # get full model output for comparison
         truth_output = self.horz_output[output_layer_name]
         
         if torch.is_tensor(truth_output):
-            logger.debug(f'Checking output from {output_layer_name} C_in {input_channels}: ')
-            max_diff, max_by_Cout, print_str, max_pError = SplitManager.compare_helper(self.current_tensor[:,input_channels,], truth_output[:,input_channels,])
-            #logger.debug(print_str)
-            logger.debug(f'Max difference layer {output_layer_name} is {torch.max(max_diff)}')
-            logger.debug(f'Max percent error layer {output_layer_name} is {max_pError}%')
-            logger.debug('\n\n')
+            logger.debug(f'Checking output from {output_layer_name} C_in {input_channels}')
+            L_inf, max_L_inf, mean_L_inf, std_L_inf, perc99_L_inf  = SplitManager.compare_helper(self.current_tensor[:,input_channels,], truth_output[:,input_channels,])
 
-            if torch.any(max_diff > limit):
-                logger.error('ERROR:')
-                logger.error(print_str)
+            # log statistics 
+            N_batch = self.current_tensor.size()[0]
+            logger.debug(f'Split comparison {output_layer_name} layer={checking_layer} batch={N_batch} max={max_L_inf} mean={mean_L_inf} std={std_L_inf} perc99={perc99_L_inf}')
+
+            # track L_inf for overall model execution
+            self.layers_checked = np.append(self.layers_checked, checking_layer)
+            self.L_inf_layer[:, checking_layer] = L_inf
+
+            # print entire model stats if this is the final layer the split manager executes
+            if self.current_layer >= self.total_layers_fx:
+                L_inf_all = self.L_inf_layer[:, self.layers_checked].flatten()
+                max_L_inf_all = torch.max(L_inf_all)
+                mean_L_inf_all= torch.mean(L_inf_all)
+                std_L_inf_all= torch.std(L_inf_all)
+
+                logger.debug(f'Entire model split comparison batch={N_batch} max={max_L_inf_all} mean={mean_L_inf_all} std={std_L_inf_all}')
+                logger.debug(f'Entire model split comparison layers={self.layers_checked}')
+
+            # check for problematic layers
+            if torch.any(L_inf > limit):
+                logger.error(f'ERROR: {output_layer_name} layer={checking_layer} L-inf > {limit} for C_in={input_channels[L_inf > limit]}')
                 return 0
             else:
-                logger.debug(f'Layer {output_layer_name} passed checking')
+                logger.debug(f'Layer {output_layer_name} passed split comparison checking (L-inf <= {limit})')
                 return 1 
         else:
             # handles "size" layer that doesn't output anything (e.g. truth_output = 1)
-            #logger.debug(f'Skipping check for output {output_layer_name} (no tensor found for ref.) ')
             return 1
 
     def expected_rx_for_layer(self, network_node, layer):
